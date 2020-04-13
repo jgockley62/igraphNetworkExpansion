@@ -63,13 +63,29 @@ RUN apt-get update\
 && R -e "BiocManager::install('edgeR')"\
 && R -e "BiocManager::install('ComplexHeatmap')"
 
-RUN R -e "devtools::install_github('gabraham/plink2R/plink2R', dependencies=TRUE)"\
-&& R -e "BiocManager::install('paxtoolsr')"\
-&& R -e "install.packages('parallel')"\
-&& R -e "BiocManager::install('clusterProfiler')"\
-&& R -e "BiocManager::install('org.Hs.eg.db')"\
-&& R -e "BiocManager::install('DOSE')"\
-&& R -e "install.packages('igraph')"\
-&& R -e "install.packages('reshape')"\
-&& R -e "install.packages('RColorBrewer')"
+
+RUN apt-get install -y r-cran-rjava \
+&& R -e "install.packages('igraph')" \
+&& R -e "install.packages('reshape')" \
+&& R -e "install.packages('RColorBrewer')"\
+&& R -e "install.packages('parallel')" \
+&& R -e "BiocManager::install('DOSE', ask=F)"\
+&& R -e "BiocManager::install('org.Hs.eg.db')"
+
+RUN sudo apt-get install -y software-properties-common \
+&& sudo apt-add-repository -y ppa:marutter/rrutter \
+#&& sudo apt-get -y update \
+&& sudo apt-get -y upgrade \
+&& sudo apt-get -y install g++ \
+&& sudo apt-get -y install libcurl4-openssl-dev
+
+RUN  sudo apt-get -y install liblzma-dev \
+&& sudo apt-get -y install libbz2-dev \
+&& sudo apt-get -y install libpcre++-dev \
+&& sudo apt-get -y install openjdk-11-jdk \ 
+&& sudo apt-get -y install libxml2-dev \
+&& sudo R CMD javareconf \
+&& R -e "BiocManager::install('paxtoolsr')" \
+&& R -e "BiocManager::install('clusterProfiler')" 
+
 

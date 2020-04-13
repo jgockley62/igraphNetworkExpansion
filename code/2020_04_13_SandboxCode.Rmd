@@ -1,0 +1,357 @@
+---
+title: "2020_04_13_Sandbox_Code"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(igraph)
+library(paxtoolsr)
+library(DOSE)
+library(org.Hs.eg.db)
+library(clusterProfiler)
+library(parallel)
+library(doParallel)
+```
+
+## R Import Data
+
+```{r Import}
+setwd('~/igraph_Network_Expansion/')
+
+User <- '< USER_ID >'
+Pass <- '< Password >'
+  
+reticulate::use_python("/usr/bin/python", required = TRUE)
+synapseclient <- reticulate::import("synapseclient")
+syn_temp <- synapseclient$Synapse()
+syn_temp$login( User, Pass, '--rememberMe' )
+
+SIFs <- c('syn21914063',
+  'syn21914056',
+  'syn21914057',
+  'syn21914059',
+  'syn21914061',
+  'syn21914064',
+  'syn21914065',
+  'syn21914070',
+  'syn21914071',
+  'syn21914072',
+  'syn21914078',
+  'syn21914082',
+  'syn21914083',
+  'syn21914087',
+  'syn21914090',
+  'syn21914091',
+  'syn21914093',
+  'syn21914094',
+  'syn21914074'
+)
+
+names(SIFs) <- c( 'Detailed', 
+                  'bind', 
+                  'biogrid', 
+                  'corum', 
+                  'ctd',
+                  'dip',
+                  'drugbank',
+                  'hprd',
+                  'humancyc',
+                  'intacsyngnc',
+                  'msigdb',
+                  'netpath',
+                  'panther',
+                  'pathbank',
+                  'pid',
+                  'psp',
+                  'reactome',
+                  'reconx',
+                  'kegg'
+  )
+
+#Load and Add names: SIFs
+boot <- function( i ){
+  foo <- read.table( file=syn_temp$get( SIFs[i] )$path , header = F, sep='\t' )
+  foo$Pathway <- as.character( i ) 
+  return(foo)
+}
+
+
+total <- list()
+Trial <- for( i in names(SIFs) ){
+  temp <- boot( i )
+  #eval(parse(text=paste0( 'total$', as.character(NAMES[i]), ' <- temp' )))
+  total[[i]] <- temp
+}
+
+Total <- do.call(rbind, total)
+Total <- Total[ , c("V1", "V3", "V2", "Pathway") ]
+colnames(Total) <- c("from", "to", "interaction", "pathway")
+
+#Caluclate how many times this intereactcion was found in all databases:
+Total$Occurance <- paste0( Total$from, '-', Total$to, ':', Total$interaction )
+foo <- paste0( Total$from, '-', Total$to, ':', Total$interaction )
+TabFoo <- table(foo)
+Total$Occurance <-  as.numeric( TabFoo[ Total$Occurance ] )
+
+Genes <- c( as.character(Total$from), as.character(Total$to) )
+Genes <- Genes[ !duplicated(Genes) ]
+Genes <- as.data.frame( Genes )
+
+#Make the pathway column into a list object
+#library(dplyr)
+#library(reshape)
+
+library(data.table)
+Total$UniqCol <- paste0( as.character(Total$from),':', as.character(Total$to),'-', as.character(Total$interaction) )
+dt <- data.table(Total[, c('UniqCol','pathway')])
+DT <- dt[,lapply(.SD, function(col) paste(col, collapse=", ")), 
+   by=.(UniqCol)]
+
+sinl<-DT
+
+foo <- as.data.frame( DT )
+poo <- as.list( strsplit(as.character(foo$pathway),',') )
+names(poo) <- foo$UniqCol
+
+totals <- Total[ !duplicated(Total$UniqCol), ]
+pathways <- poo
+
+table(names(pathways) == as.character(totals$UniqCol))
+table( as.character(totals$UniqCol) == names(pathways) )
+
+totals$PATH <- pathways
+
+Total <- totals[,c("from", "to", "interaction", "Occurance", "UniqCol", "PATH")]
+colnames(Total) <- c("from", "to", "interaction", "Occurance", "UniqCol", "pathway")
+
+#Make into a network graph
+
+Graph <- list()
+for(type in levels(Total$interaction) ){
+  #NET <- graph_from_data_frame(d=Total[ Total$interaction == type, ], vertices=Genes, directed=T) 
+  #set_graph_attr(NET,"interaction","controls-transport-of-chemical")
+  eval( parse( text=paste0('Graph$`', type, '` <- graph_from_data_frame(d=Total[ Total$interaction == \'', type, '\', ], vertices=Genes, directed=T) ') ) )
+}
+#Edge Sum is 1903389
+
+net <- igraph::disjoint_union( Graph$`interacts-with`,
+               Graph$`in-complex-with`,
+               Graph$`catalysis-precedes`,
+               Graph$`chemical-affects`,
+               Graph$`consumption-controlled-by`,
+               Graph$`controls-expression-of`,
+               Graph$`controls-production-of`,
+               Graph$`controls-state-change-of`,
+               Graph$`reacts-with`,
+               Graph$`used-to-produce`,
+               Graph$`controls-phosphorylation-of`,
+               Graph$`controls-transport-of`,
+               Graph$`controls-transport-of-chemical`
+             )
+for(type in levels(Total$interaction) ){
+  message( paste0( type, ": ", eval(parse(text=paste0(  'length(E(Graph$`', type, '`))' ))) ))
+}
+
+#Edge Sum is 1903389
+length(E(net))
+#Edge Sum net Union is 1804977
+#Edge Sum net disjoint.Union is 1903389
+length(E(net_oldStyle))
+#Edge Sum old is 1903389
+
+get.edge.ids(graph, vp, directed = TRUE, error = FALSE, multi = FALSE)
+
+#$epath
+#$epath[[1]]
+#+ 1/3531342 edge from 163b141 (vertex names):
+#  [1] PIK3CA->PIK3R1
+
+net_oldStyle <- graph_from_data_frame(d=Total, vertices=Genes, directed=T) 
+
+V(net_oldStyle)[ names(V(net_oldStyle)) == 'PIK3CA' ]
+as.numeric( as.character(V(net_oldStyle)[ names(V(net_oldStyle)) == 'PIK3CA' ]) )
+get.edge.ids( net_oldStyle, 'PIK3CA', multi=T )
+
+
+#@sk:All interactions of our interested partners
+Total[ (Total$from =='PIK3R1' & Total$to=='PIK3CA') | (Total$from =='PIK3CA' & Total$to=='PIK3R1') , ]
+
+#@sk:Do we have multiple edge IDs:
+table( which_multiple(net_oldStyle, eids = E(net_oldStyle)) )
+#   FALSE    TRUE 
+# 1804977   98412
+#---# Yes We Do
+
+#@sk:
+fun<-Total
+fun$Extra <- paste0( as.character(fun$from), ':', as.character(fun$to) )
+table(table(fun$Extra))
+#       1       2       3       4       5       6 
+# 1717982   77152    8438    1243     155       7 
+
+77152*1+8438*2+1243*3+155*4+7*5
+# 98412 - igraph Not ocunting the first instance as duplicated !!!
+
+
+
+#plot(net, edge.arrow.size=.4,vertex.label=NA)
+#DIST <- distances(net)
+
+#Shortest Path
+news.path.all <- all_shortest_paths(net_oldStyle,
+                            from = V(net_oldStyle)["PIK3CA"], 
+                            to  = V(net_oldStyle)["PIK3R1"],
+                            mode = "all") # both path nodes and edges
+
+news.path.all <- all_shortest_paths(net_oldStyle,
+                                    from = V(net_oldStyle)["APOE"], 
+                                    to  = V(net_oldStyle)["TREM2"],
+                                    mode = "all") # both path nodes and edges
+
+#Woof
+MiniNet <- subgraph.edges(net_oldStyle, as_ids(news.path.all$res[[1]]), delete.vertices = TRUE)
+
+news.path <- shortest_paths(net_oldStyle, 
+                                from = V(net_oldStyle)["APOE"], 
+                                to  = V(net_oldStyle)["TREM2"],
+                                mode = "all",
+                                output = c('both')
+                            )# both path nodes and edges
+MiniNet <- subgraph.edges(net_oldStyle, as_ids(news.path$epath[[1]]), delete.vertices = TRUE)
+
+
+#This Can Work......
+Trial.path <- induced_subgraph( net_oldStyle, vids= c(names(V(net_oldStyle)["PIK3CA"]), names(V(net_oldStyle)["PIK3R1"])) )
+igraph::plot.igraph(Trial.path, edge.arrow.size=.4)
+
+
+Total[ Total$to == 'PIK3R1' & Total$from == 'PIK3CA', ]
+
+#_#
+#news.path <- all_simple_paths(net, from = V(net)["TREM2"], to  = V(net)["APOE"] )
+#_#
+
+#Use Edges
+#as_ids(news.path$epath)
+
+
+igraph::plot.igraph(MiniNet, edge.arrow.size=.4)
+edge.width = E(MiniNet)$pathway
+
+#Edge Colors
+Inters <- E(net)$interaction
+Inters <- Inters[ !duplicated(Inters) ]
+
+library(RColorBrewer)
+n <- length(Inters)
+qual_col_pals = brewer.pal.info[brewer.pal.info$category == 'qual',]
+col_vector = unlist(mapply(brewer.pal, qual_col_pals$maxcolors, rownames(qual_col_pals)))
+pie(rep(1,n), col=sample(col_vector, n))
+
+Colors <- sample(col_vector, n)
+names(Colors) <- Inters
+
+#Use Verticies
+MiniNet <- induced.subgraph( net, as_ids(news.path$vpath[[1]]) )
+MiniNet <- MiniNet %>%
+  set_edge_attr("color", value = c( Colors[ c(E(MiniNet)$interaction) ]) )
+
+plot( MiniNet, edge.arrow.size=1 )
+
+
+plot(news.path$epath, edge.arrow.size=.4,vertex.label=NA)
+graph_from_data_frame(d=Total, vertices=Genes, directed=T)
+
+
+nnet <- graph_from_edgelist(news.path$epath)
+?graph_from
+###
+
+actors <- data.frame(name=c("Alice", "Bob", "Cecil", "David",
+                            "Esmeralda"),
+                     age=c(48,33,45,34,21),
+                     gender=c("F","M","F","M","F"))
+relations <- data.frame(from=c("Bob", "Cecil", "Cecil", "David",
+                               "David", "Esmeralda"),
+                        to=c("Alice", "Bob", "Alice", "Alice", "Bob", "Alice"),
+                        same.dept=c(FALSE,FALSE,TRUE,FALSE,FALSE,TRUE),
+                        friendship=c(4,5,5,2,1,1), advice=c(4,5,5,4,2,3))
+g <- graph_from_data_frame(relations, directed=TRUE, vertices=actors)
+print(g, e=TRUE, v=TRUE)
+
+
+###
+
+
+
+#Examine More
+df <- read.table( file = 'PathwayCommons/SIF/TotalMerged.sif', header = F, sep='\t')
+df$V4 <- paste0( df$V1, '-', df$V3, ':', df$V2 )
+table(table(df$V4))
+
+#Delta is: 21604
+
+DF <- read.table( file = 'PathwayCommons/SIF/PathwayCommons12.All.hgnc.sif', header = F, sep='\t')
+DF$V4 <- paste0( DF$V1, '-', DF$V3, ':', DF$V2 )
+
+row.names(DF) <- DF$V4
+row.names(df) <- df$V4
+
+(row.names(df) %in% row.names(DF))
+table(row.names(df) %in% row.names(DF))
+# FALSE    TRUE 
+# 21604    1884849 
+
+MISS <- df[ row.names(df)[(row.names(df) %in% row.names(DF))==F], ]
+
+
+net <- graph_from_data_frame(d=links, vertices=nodes, directed=T) 
+
+
+###########################
+#trash
+
+Interactions <- paste0(  paste0( Total$from, '-', Total$to, ':', Total$interaction ) )
+Total$UniqCol <- paste0(  paste0( Total$from, '-', Total$to, ':', Total$interaction ) )
+
+Ints <- rep( NA, length(Interactions[!duplicated(Interactions)]) )
+names(Ints) <- Interactions[!duplicated(Interactions)]
+
+Foo <- as.list(Ints)
+
+cl <- makeCluster( detectCores()-2 )
+registerDoParallel(cl)
+
+mark <- Sys.time()
+for( Entry in names(Foo)[1:40] ){
+  eval(parse(text=paste0('Foo[[\'', Entry, '\']] <- Total[ Total$UniqCol %in% \'', Entry, '\', ]$pathway')))
+}
+Sys.time()-mark
+
+#Entry <- "PIK3CA-PIK3R1:in-complex-with"
+IntersList <- list()
+for( Entry in Interactions ){
+  eval(parse(text=paste0('IntersList$`', Entry, '` <- Total[ Total$UniqCol %in% \'', Entry, '\', ]$pathway')))
+}
+
+Puller <- function( Entry, Total){
+  eval(parse(text=paste0( '\'', Entry, '\' <- Total[ Total[,6] %in% \'', Entry, '\', ][,4]')))
+  eval(parse(text=paste0( 'return( `', Entry, '` )' ))) 
+}
+
+cl <- makeCluster( detectCores()-2 )
+registerDoParallel(cl)
+#Total = as.data.frame(Total)
+IntersList <- foreach( Entry = Interactions[1:2])  %dopar% { 
+  eval(parse(text=paste0( '\'', Entry, '\' <- Puller( Entry=', Entry,', Total=', Total, ' ) ')))
+}
+
+
+IntersList <- foreach( Entry = Interactions[1:5], .init = as.data.frame(Total), .combine = rbind)  %dopar% {
+  
+  eval(parse(text=paste0( '\'', Entry, '\' <- Total[ Total[,6] %in% \'', Entry, '\', ][,4]')))
+  #eval(parse(text=paste0( 'foo <- Total[ Total$UniqCol %in% \'', Entry, '\', ]$pathway')))
+  eval(parse(text=paste0( 'return( `', Entry, '` )' ))) 
+}
+```

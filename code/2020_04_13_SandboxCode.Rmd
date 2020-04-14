@@ -106,8 +106,7 @@ Genes <- as.data.frame( Genes )
 library(data.table)
 Total$UniqCol <- paste0( as.character(Total$from),':', as.character(Total$to),'-', as.character(Total$interaction) )
 dt <- data.table(Total[, c('UniqCol','pathway')])
-DT <- dt[,lapply(.SD, function(col) paste(col, collapse=", ")), 
-   by=.(UniqCol)]
+DT <- dt[,lapply(.SD, function(col) paste(col, collapse=", ")), by=.(UniqCol)]
 
 sinl<-DT
 
@@ -122,6 +121,9 @@ table(names(pathways) == as.character(totals$UniqCol))
 table( as.character(totals$UniqCol) == names(pathways) )
 
 totals$PATH <- pathways
+totals$PATH <- lapply( totals$PATH,
+               function(x) gsub(" ","", x)
+             )
 
 Total <- totals[,c("from", "to", "interaction", "Occurance", "UniqCol", "PATH")]
 colnames(Total) <- c("from", "to", "interaction", "Occurance", "UniqCol", "pathway")
@@ -211,7 +213,9 @@ MiniNet <- MiniNet %>%
 
 plot( MiniNet, edge.arrow.size=.45 )
 
-#Color the Edges Based on interaction type
+####Color the Edges Based on INTERACTION TYPE, EDGE OCCURENCE AMONG THE USER SELECTED PATHWAYS, 
+
+  #Choose Colors
 Inters <- E(net_oldStyle)$interaction
 Inters <- Inters[ !duplicated(Inters) ]
 
@@ -223,24 +227,52 @@ pie(rep(1,n), col=sample(col_vector, n))
 Colors <- sample(col_vector, n)
 names(Colors) <- Inters
 
-#Use Verticies
-MiniNet <- Trial.path #induced.subgraph( Trial.path, as_ids(news.path$vpath[[1]]) )
+  ## - User input option to subgraph based on Pathway(s)
+toMatch <- c( "Detailed", "bind", "biogrid", "corum", "ctd", "dip", "drugbank", "hprd", "humancyc", "intacsyngnc", "msigdb", "netpath", "panther", "pathbank", "pid", "psp", "reactome", "reconx", "kegg" )
+
+Keeps <- grep( paste(toMatch,collapse="|"), E(Trial.path)$pathway)
+Trial.path_Filt <- subgraph.edges(Trial.path, eids=Keeps, delete.vertices = TRUE)
+
+Weights <- apply( sapply( E( Trial.path_Filt )$pathway, function(x) toMatch %in% x),
+       2,
+       function(x) table(x)["TRUE"]
+)
+             
+
+#toMatch %in% gsub(' ', '', E( Trial.path_Filt )$pathway[[1]])
+
+  ## - Set Color and Weight Atributes
+MiniNet <- Trial.path_Filt #induced.subgraph( Trial.path, as_ids(news.path$vpath[[1]]) )
 MiniNet <- MiniNet %>%
-  set_edge_attr("weight",  value = as.numeric(c(E(Trial.path)$Occurance))/11 ) %>%
-  set_edge_attr( "color", value = c( Colors[ c(E(Trial.path)$interaction) ]) ) 
+  # Old for pre-pathway selection - set_edge_attr("weight",  value = lengths(E(Trial.path_Filt)$pathway )/(2*max( lengths( E(Trial.path_Filt)$pathway ))) ) %>%
+  set_edge_attr("weight",  value = Weights /(1.25**max( lengths( Weights ) )) ) %>% 
+  set_edge_attr( "color", value = c( Colors[ c(E(Trial.path_Filt)$interaction) ]) ) 
   
+  ## - Plot Final Network
 par(xpd=TRUE)
-plot( MiniNet, edge.width = E(g)$weight, edge.arrow.size=.4 )
-legend('topleft', legend=names(Colors), col= "black", pt.cex = 2, pch=21, pt.bg=Colors, bty='n')
+plot( MiniNet, edge.width = E(MiniNet)$weight, edge.arrow.size=.4 )
+legend('topleft', legend=names(Colors), 
+       col= "black", pt.cex = 2, pch=21, 
+       pt.bg=Colors, bty='n', title="Interaction Type" )
+legend("topright", 
+       #Old For All Pathways - legend = lengths(E(Trial.path_Filt)$pathway )[!duplicated(lengths(E(Trial.path_Filt)$pathway ))], #Labels
+       legend = names(table( Weights )), #Labels
+       lwd = as.numeric(names(table( Weights )))/(1.25*max( lengths( Weights ) )),
+       col = "black",
+       bty='n', 
+       title="Pathway Redundancy")
+mtext( paste0( "Pathways Examined: ", paste(toMatch, collapse = ', ')), 1 )
 
-#Set variable size of edges based on pathway redundancy
-set_edge_attr("weight", value = 1:10)
 
 
 
 
 
-#User input option to subgraph based on Pathway(s)
+
+
+
+############################# XXXXX #############################
+
 
 
 
@@ -249,12 +281,23 @@ set_edge_attr("weight", value = 1:10)
 
 
 
-############################# #############################
 
 
 
 
-
+# Old Code #
+# par(xpd=TRUE)
+# plot( MiniNet, edge.width = E(g)$weight, edge.arrow.size=.4 )
+# legend('topleft', legend=names(Colors), 
+#         col= "black", pt.cex = 2, pch=21, 
+#         pt.bg=Colors, bty='n', title="Interaction Type" )
+# legend("topright", 
+#         legend = lengths(E(Trial.path_Filt)$pathway )[!duplicated(lengths(E(Trial.path_Filt)$pathway ))], #Labels
+#         lwd = lengths(E(Trial.path_Filt)$pathway )[!duplicated(lengths(E(Trial.path_Filt)$pathway ))],
+#         col = "black",
+#         bty='n', 
+#         title="Pathway Redundancy")
+# mtext( paste0( "Patways Examined: ", paste(toMatch, collapse = ' ,')), 1 )
 
 
 

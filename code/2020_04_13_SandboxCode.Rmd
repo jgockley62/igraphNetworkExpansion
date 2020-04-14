@@ -12,6 +12,8 @@ library(org.Hs.eg.db)
 library(clusterProfiler)
 library(parallel)
 library(doParallel)
+library(RColorBrewer)
+
 ```
 
 ## R Import Data
@@ -76,7 +78,6 @@ boot <- function( i ){
   return(foo)
 }
 
-
 total <- list()
 Trial <- for( i in names(SIFs) ){
   temp <- boot( i )
@@ -126,7 +127,329 @@ Total <- totals[,c("from", "to", "interaction", "Occurance", "UniqCol", "PATH")]
 colnames(Total) <- c("from", "to", "interaction", "Occurance", "UniqCol", "pathway")
 
 #Make into a network graph
+#Make into a network graph
 
+Graph <- list()
+for(type in levels(Total$interaction) ){
+  #NET <- graph_from_data_frame(d=Total[ Total$interaction == type, ], vertices=Genes, directed=T) 
+  #set_graph_attr(NET,"interaction","controls-transport-of-chemical")
+  eval( parse( text=paste0('Graph$`', type, '` <- graph_from_data_frame(d=Total[ Total$interaction == \'', type, '\', ], vertices=Genes, directed=T) ') ) )
+}
+#Edge Sum is 1903389
+
+#Make a network object (! This only has single edge types per-vertex !)
+net_oldStyle <- igraph::disjoint_union( Graph$`interacts-with`,
+               Graph$`in-complex-with`,
+               Graph$`catalysis-precedes`,
+               Graph$`chemical-affects`,
+               Graph$`consumption-controlled-by`,
+               Graph$`controls-expression-of`,
+               Graph$`controls-production-of`,
+               Graph$`controls-state-change-of`,
+               Graph$`reacts-with`,
+               Graph$`used-to-produce`,
+               Graph$`controls-phosphorylation-of`,
+               Graph$`controls-transport-of`,
+               Graph$`controls-transport-of-chemical`
+             )
+for(type in levels(Total$interaction) ){
+  message( paste0( type, ": ", eval(parse(text=paste0(  'length(E(Graph$`', type, '`))' ))) ))
+}
+
+#Edge Sum is 1903389
+length(E(net_oldStyle))
+
+#Another way to make the Network object But has multiple edges per-Vertex set
+net_oldStyle <- graph_from_data_frame(d=Total, vertices=Genes, directed=T) 
+
+#_# Test Code
+#@sk:All interactions of our interested partners
+Total[ (Total$from =='PIK3R1' & Total$to=='PIK3CA') | (Total$from =='PIK3CA' & Total$to=='PIK3R1') , ]
+
+#@sk:Do we have multiple edge IDs:
+table( which_multiple(net_oldStyle, eids = E(net_oldStyle)) )
+#   FALSE    TRUE 
+# 1804977   98412
+#---# Yes We Do
+
+#@sk:
+fun<-Total
+fun$Extra <- paste0( as.character(fun$from), ':', as.character(fun$to) )
+table(table(fun$Extra))
+
+#Get the shortest path...
+news.path <- shortest_paths(net_oldStyle, 
+                                from = V(net_oldStyle)["PIK3CA"], 
+                                to  = V(net_oldStyle)["PIK3R1"],
+                                mode = "all",
+                                output = c('both')
+                            )# both path nodes and edges
+
+Trial.path <- induced_subgraph( net_oldStyle, colnames(do.call( rbind, news.path$vpath )) )
+igraph::plot.igraph(Trial.path, edge.arrow.size=.4)
+
+# Get the vertecies of N Gene Ids
+Trial.path <- induced_subgraph( net_oldStyle, c( "A1BG", "ABCC5", "ABI1", "ABI1", "ABI2", "ACACA", "PIK3R1", "PIK3CA" ) )
+igraph::plot.igraph(Trial.path, edge.arrow.size=.4)
+
+#Color the Edges Based on interaction type
+Inters <- E(net_oldStyle)$interaction
+Inters <- Inters[ !duplicated(Inters) ]
+
+n <- length(Inters)
+qual_col_pals = brewer.pal.info[brewer.pal.info$category == 'qual',]
+col_vector = unlist(mapply(brewer.pal, qual_col_pals$maxcolors, rownames(qual_col_pals)))
+pie(rep(1,n), col=sample(col_vector, n))
+
+Colors <- sample(col_vector, n)
+names(Colors) <- Inters
+
+#Use Verticies
+MiniNet <- Trial.path #induced.subgraph( Trial.path, as_ids(news.path$vpath[[1]]) )
+MiniNet <- MiniNet %>%
+  set_edge_attr("color", value = c( Colors[ c(E(Trial.path)$interaction) ]) )
+
+plot( MiniNet, edge.arrow.size=.45 )
+
+#Color the Edges Based on interaction type
+Inters <- E(net_oldStyle)$interaction
+Inters <- Inters[ !duplicated(Inters) ]
+
+n <- length(Inters)
+qual_col_pals = brewer.pal.info[brewer.pal.info$category == 'qual',]
+col_vector = unlist(mapply(brewer.pal, qual_col_pals$maxcolors, rownames(qual_col_pals)))
+pie(rep(1,n), col=sample(col_vector, n))
+
+Colors <- sample(col_vector, n)
+names(Colors) <- Inters
+
+#Use Verticies
+MiniNet <- Trial.path #induced.subgraph( Trial.path, as_ids(news.path$vpath[[1]]) )
+MiniNet <- MiniNet %>%
+  set_edge_attr("weight",  value = as.numeric(c(E(Trial.path)$Occurance))/11 ) %>%
+  set_edge_attr( "color", value = c( Colors[ c(E(Trial.path)$interaction) ]) ) 
+  
+par(xpd=TRUE)
+plot( MiniNet, edge.width = E(g)$weight, edge.arrow.size=.4 )
+legend('topleft', legend=names(Colors), col= "black", pt.cex = 2, pch=21, pt.bg=Colors, bty='n')
+
+#Set variable size of edges based on pathway redundancy
+set_edge_attr("weight", value = 1:10)
+
+
+
+
+
+#User input option to subgraph based on Pathway(s)
+
+
+
+############################# #############################
+
+
+
+
+############################# #############################
+
+
+
+
+
+
+
+
+Graph <- list()
+for(type in levels(Total$interaction) ){
+  #NET <- graph_from_data_frame(d=Total[ Total$interaction == type, ], vertices=Genes, directed=T) 
+  #set_graph_attr(NET,"interaction","controls-transport-of-chemical")
+  eval( parse( text=paste0('Graph$`', type, '` <- graph_from_data_frame(d=Total[ Total$interaction == \'', type, '\', ], vertices=Genes, directed=T) ') ) )
+}
+#Edge Sum is 1903389
+
+net <- igraph::disjoint_union( Graph$`interacts-with`,
+               Graph$`in-complex-with`,
+               Graph$`catalysis-precedes`,
+               Graph$`chemical-affects`,
+               Graph$`consumption-controlled-by`,
+               Graph$`controls-expression-of`,
+               Graph$`controls-production-of`,
+               Graph$`controls-state-change-of`,
+               Graph$`reacts-with`,
+               Graph$`used-to-produce`,
+               Graph$`controls-phosphorylation-of`,
+               Graph$`controls-transport-of`,
+               Graph$`controls-transport-of-chemical`
+             )
+for(type in levels(Total$interaction) ){
+  message( paste0( type, ": ", eval(parse(text=paste0(  'length(E(Graph$`', type, '`))' ))) ))
+}
+
+#How many Edges
+length(E(net))
+
+#Edge Sum old is 1903389
+length(E(net_oldStyle))
+
+net_oldStyle <- graph_from_data_frame(d=Total, vertices=Genes, directed=T) 
+
+V(net_oldStyle)[ names(V(net_oldStyle)) == 'PIK3CA' ]
+as.numeric( as.character(V(net_oldStyle)[ names(V(net_oldStyle)) == 'PIK3CA' ]) )
+get.edge.ids( net_oldStyle, 'PIK3CA', multi=T )
+
+
+#@sk:All interactions of our interested partners
+Total[ (Total$from =='PIK3R1' & Total$to=='PIK3CA') | (Total$from =='PIK3CA' & Total$to=='PIK3R1') , ]
+
+#@sk:Do we have multiple edge IDs:
+table( which_multiple(net_oldStyle, eids = E(net_oldStyle)) )
+#   FALSE    TRUE 
+# 1804977   98412
+#---# Yes We Do
+
+#@sk:
+fun<-Total
+fun$Extra <- paste0( as.character(fun$from), ':', as.character(fun$to) )
+table(table(fun$Extra))
+#       1       2       3       4       5       6 
+# 1717982   77152    8438    1243     155       7 
+
+77152*1+8438*2+1243*3+155*4+7*5
+# 98412 - igraph Not ocunting the first instance as duplicated !!!
+
+
+
+#plot(net, edge.arrow.size=.4,vertex.label=NA)
+#DIST <- distances(net)
+#This Can Work......
+
+#Get the shortest path...
+news.path <- shortest_paths(net_oldStyle, 
+                                from = V(net_oldStyle)["PIK3CA"], 
+                                to  = V(net_oldStyle)["PIK3R1"],
+                                mode = "all",
+                                output = c('both')
+                            )# both path nodes and edges
+
+Trial.path <- induced_subgraph( net_oldStyle, colnames(do.call( rbind, news.path$vpath )) )
+igraph::plot.igraph(Trial.path, edge.arrow.size=.4)
+
+# Get the vertecies of N Gene Ids
+Trial.path <- induced_subgraph( net_oldStyle, c( "A1BG", "ABCC5", "ABI1", "ABI1", "ABI2", "ACACA", "PIK3R1", "PIK3CA" ) )
+igraph::plot.igraph(Trial.path, edge.arrow.size=.4)
+
+
+#Color the Edges Based on interaction type
+Inters <- E(net_oldStyle)$interaction
+Inters <- Inters[ !duplicated(Inters) ]
+
+n <- length(Inters)
+qual_col_pals = brewer.pal.info[brewer.pal.info$category == 'qual',]
+col_vector = unlist(mapply(brewer.pal, qual_col_pals$maxcolors, rownames(qual_col_pals)))
+pie(rep(1,n), col=sample(col_vector, n))
+
+Colors <- sample(col_vector, n)
+names(Colors) <- Inters
+
+#Use Verticies
+MiniNet <- Trial.path #induced.subgraph( Trial.path, as_ids(news.path$vpath[[1]]) )
+MiniNet <- MiniNet %>%
+  set_edge_attr("color", value = c( Colors[ c(E(Trial.path)$interaction) ]) )
+
+plot( MiniNet, edge.arrow.size=.75 )
+
+
+####################################
+
+plot(news.path$epath, edge.arrow.size=.4,vertex.label=NA)
+graph_from_data_frame(d=Total, vertices=Genes, directed=T)
+
+
+nnet <- graph_from_edgelist(news.path$epath)
+?graph_from
+###
+
+actors <- data.frame(name=c("Alice", "Bob", "Cecil", "David",
+                            "Esmeralda"),
+                     age=c(48,33,45,34,21),
+                     gender=c("F","M","F","M","F"))
+relations <- data.frame(from=c("Bob", "Cecil", "Cecil", "David",
+                               "David", "Esmeralda"),
+                        to=c("Alice", "Bob", "Alice", "Alice", "Bob", "Alice"),
+                        same.dept=c(FALSE,FALSE,TRUE,FALSE,FALSE,TRUE),
+                        friendship=c(4,5,5,2,1,1), advice=c(4,5,5,4,2,3))
+g <- graph_from_data_frame(relations, directed=TRUE, vertices=actors)
+print(g, e=TRUE, v=TRUE)
+
+
+###
+
+
+
+#Examine More
+df <- read.table( file = 'PathwayCommons/SIF/TotalMerged.sif', header = F, sep='\t')
+df$V4 <- paste0( df$V1, '-', df$V3, ':', df$V2 )
+table(table(df$V4))
+
+#Delta is: 21604
+
+DF <- read.table( file = 'PathwayCommons/SIF/PathwayCommons12.All.hgnc.sif', header = F, sep='\t')
+DF$V4 <- paste0( DF$V1, '-', DF$V3, ':', DF$V2 )
+
+row.names(DF) <- DF$V4
+row.names(df) <- df$V4
+
+(row.names(df) %in% row.names(DF))
+table(row.names(df) %in% row.names(DF))
+# FALSE    TRUE 
+# 21604    1884849 
+
+MISS <- df[ row.names(df)[(row.names(df) %in% row.names(DF))==F], ]
+
+
+net <- graph_from_data_frame(d=links, vertices=nodes, directed=T) 
+
+
+Total <- do.call(rbind, total)
+Total <- Total[ , c("V1", "V3", "V2", "Pathway") ]
+colnames(Total) <- c("from", "to", "interaction", "pathway")
+
+#Caluclate how many times this intereactcion was found in all databases:
+Total$Occurance <- paste0( Total$from, '-', Total$to, ':', Total$interaction )
+foo <- paste0( Total$from, '-', Total$to, ':', Total$interaction )
+TabFoo <- table(foo)
+Total$Occurance <-  as.numeric( TabFoo[ Total$Occurance ] )
+
+Genes <- c( as.character(Total$from), as.character(Total$to) )
+Genes <- Genes[ !duplicated(Genes) ]
+Genes <- as.data.frame( Genes )
+
+#Make the pathway column into a list object
+#library(dplyr)
+#library(reshape)
+
+library(data.table)
+Total$UniqCol <- paste0( as.character(Total$from),':', as.character(Total$to),'-', as.character(Total$interaction) )
+dt <- data.table(Total[, c('UniqCol','pathway')])
+DT <- dt[,lapply(.SD, function(col) paste(col, collapse=", ")), by=.(UniqCol)]
+
+sinl <- DT
+
+foo <- as.data.frame( DT )
+poo <- as.list( strsplit(as.character(foo$pathway),',') )
+names(poo) <- foo$UniqCol
+
+totals <- Total[ !duplicated(Total$UniqCol), ]
+pathways <- poo
+
+table(names(pathways) == as.character(totals$UniqCol))
+table( as.character(totals$UniqCol) == names(pathways) )
+
+totals$PATH <- pathways
+
+Total <- totals[,c("from", "to", "interaction", "Occurance", "UniqCol", "PATH")]
+colnames(Total) <- c("from", "to", "interaction", "Occurance", "UniqCol", "pathway")
+
+#Make into a network graph
 Graph <- list()
 for(type in levels(Total$interaction) ){
   #NET <- graph_from_data_frame(d=Total[ Total$interaction == type, ], vertices=Genes, directed=T) 
@@ -157,10 +480,10 @@ for(type in levels(Total$interaction) ){
 length(E(net))
 #Edge Sum net Union is 1804977
 #Edge Sum net disjoint.Union is 1903389
-length(E(net_oldStyle))
+#length(E(net_oldStyle))
 #Edge Sum old is 1903389
 
-get.edge.ids(graph, vp, directed = TRUE, error = FALSE, multi = FALSE)
+#get.edge.ids(graph, vp, directed = TRUE, error = FALSE, multi = FALSE)
 
 #$epath
 #$epath[[1]]

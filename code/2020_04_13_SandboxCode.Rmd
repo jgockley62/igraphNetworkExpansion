@@ -237,9 +237,6 @@ Weights <- apply( sapply( E( Trial.path_Filt )$pathway, function(x) toMatch %in%
        2,
        function(x) table(x)["TRUE"]
 )
-             
-
-#toMatch %in% gsub(' ', '', E( Trial.path_Filt )$pathway[[1]])
 
   ## - Set Color and Weight Atributes
 MiniNet <- Trial.path_Filt #induced.subgraph( Trial.path, as_ids(news.path$vpath[[1]]) )
@@ -248,9 +245,18 @@ MiniNet <- MiniNet %>%
   set_edge_attr("weight",  value = Weights /(1.25**max( lengths( Weights ) )) ) %>% 
   set_edge_attr( "color", value = c( Colors[ c(E(Trial.path_Filt)$interaction) ]) ) 
   
+  ## Remove Direction from non-directional nodes
+  E(MiniNet)$interaction
+  Ints <- c( 0.4, 0.4, 0.4, 0.4,  0.4, 0.4, 0.4, 0.4, 0.4, 0, 0, 0, 0  )
+  names(Ints) <- names( table(Total$interaction) )  
+  DirectionArrowSize <- as.numeric( Ints[ E(MiniNet)$interaction ] )
+  
+  MiniNet <- MiniNet %>%
+    set_edge_attr("DirectionArrowSize",  value = DirectionArrowSize ) 
+  
   ## - Plot Final Network
 par(xpd=TRUE)
-plot( MiniNet, edge.width = E(MiniNet)$weight, edge.arrow.size=.4 )
+plot( MiniNet, edge.width = E(MiniNet)$weight, edge.arrow.size=E(MiniNet)$DirectionArrowSize )   #.4 )E(graph)$direction)
 legend('topleft', legend=names(Colors), 
        col= "black", pt.cex = 2, pch=21, 
        pt.bg=Colors, bty='n', title="Interaction Type" )
@@ -262,6 +268,9 @@ legend("topright",
        bty='n', 
        title="Pathway Redundancy")
 mtext( paste0( "Pathways Examined: ", paste(toMatch, collapse = ', ')), 1 )
+
+
+
 
 
 

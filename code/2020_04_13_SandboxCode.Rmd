@@ -292,6 +292,22 @@ legend("topright",
        title="Pathway Redundancy")
 mtext( paste0( "Pathways Examined: ", paste(toMatch, collapse = ', ')), 1 )
 
+#################################################################
+#Convert Network into Cytoscape Object:
+source('~/igraph_Network_Expansion/NetworkAnalysis/cytoscape_util.R')
+
+port.number = 8787
+base.url = paste("http://localhost:", toString(port.number), "/v1", sep="")
+print(base.url)
+
+setInternet2(TRUE)
+
+# Convert it into Cytosccape.js JSON
+cygraph <- toCytoscape( MiniNet )
+send2cy(cygraph, 'default%20black', 'circular')
+
+
+
 
 
 

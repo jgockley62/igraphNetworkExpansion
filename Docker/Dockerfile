@@ -88,4 +88,4 @@ RUN  sudo apt-get -y install liblzma-dev \
 && R -e "BiocManager::install('paxtoolsr')" \
 && R -e "BiocManager::install('clusterProfiler')" \
 && R -e "install.packages('RJSONIO')"\
-
+&& R -e "BiocManager::install('RCy3')

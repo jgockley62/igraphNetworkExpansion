@@ -8,6 +8,8 @@ knitr::opts_chunk$set(echo = TRUE)
 setwd('~/igraph_Network_Expansion/')
 library(igraph)
 library(paxtoolsr)
+library(RJSONIO)
+library(httr)
 library(DOSE)
 library(org.Hs.eg.db)
 library(clusterProfiler)
@@ -203,7 +205,10 @@ Grabber <- function( Input ){
   return( temp )                   
 }
 
-foo <- do.call( Grabber, Trial.OBJ)
+####################
+
+
+#foo <- do.call( Grabber, Trial.OBJ)
 
 
 igraph::plot.igraph(Trial.path, edge.arrow.size=.4)

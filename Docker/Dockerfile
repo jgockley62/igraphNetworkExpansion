@@ -86,6 +86,6 @@ RUN  sudo apt-get -y install liblzma-dev \
 && sudo apt-get -y install libxml2-dev \
 && sudo R CMD javareconf \
 && R -e "BiocManager::install('paxtoolsr')" \
-&& R -e "BiocManager::install('clusterProfiler')" 
-
+&& R -e "BiocManager::install('clusterProfiler')" \
+&& R -e "install.packages('RJSONIO')"\
 

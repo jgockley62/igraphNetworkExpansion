@@ -81,91 +81,88 @@ boot <- function( i ){
   return(foo)
 }
 
-total <- list()
-Trial <- for( i in names(SIFs) ){
-  temp <- boot( i )
-  #eval(parse(text=paste0( 'total$', as.character(NAMES[i]), ' <- temp' )))
-  total[[i]] <- temp
+Loader <- function( SIFs){
+  #'@SIFs An object that has SynID values and named for the database
+  ##  Each Syn ID is a SIF format file 
+  
+  total <- list()
+  Trial <- for( i in names(SIFs) ){
+    temp <- boot( i )
+    #eval(parse(text=paste0( 'total$', as.character(NAMES[i]), ' <- temp' )))
+    total[[i]] <- temp
+  }
+  
+  Total <- do.call(rbind, total)
+  Total <- Total[ , c("V1", "V3", "V2", "Pathway") ]
+  colnames(Total) <- c("from", "to", "interaction", "pathway")
+  
+  #Caluclate how many times this intereactcion was found in all databases:
+  Total$Occurance <- paste0( Total$from, '-', Total$to, ':', Total$interaction )
+  foo <- paste0( Total$from, '-', Total$to, ':', Total$interaction )
+  TabFoo <- table(foo)
+  Total$Occurance <-  as.numeric( TabFoo[ Total$Occurance ] )
+  
+  Genes <- c( as.character(Total$from), as.character(Total$to) )
+  Genes <- Genes[ !duplicated(Genes) ]
+  Genes <- as.data.frame( Genes )
+  
+  #Make the pathway column into a list object
+  #library(dplyr)
+  #library(reshape)
+  
+  library(data.table)
+  Total$UniqCol <- paste0( as.character(Total$from),':', as.character(Total$to),'-', as.character(Total$interaction) )
+  dt <- data.table(Total[, c('UniqCol','pathway')])
+  DT <- dt[,lapply(.SD, function(col) paste(col, collapse=", ")), by=.(UniqCol)]
+  
+  sinl<-DT
+  
+  foo <- as.data.frame( DT )
+  poo <- as.list( strsplit(as.character(foo$pathway),',') )
+  names(poo) <- foo$UniqCol
+  
+  totals <- Total[ !duplicated(Total$UniqCol), ]
+  pathways <- poo
+  
+  table(names(pathways) == as.character(totals$UniqCol))
+  table( as.character(totals$UniqCol) == names(pathways) )
+  
+  totals$PATH <- pathways
+  totals$PATH <- lapply( totals$PATH,
+                 function(x) gsub(" ","", x)
+               )
+  
+  Total <- totals[,c("from", "to", "interaction", "Occurance", "UniqCol", "PATH")]
+  colnames(Total) <- c("from", "to", "interaction", "Occurance", "UniqCol", "pathway")
+  
+  #Make into a network graph
+  #Make into a network graph
+  
+  Graph <- list()
+  for(type in levels(Total$interaction) ){
+    #NET <- graph_from_data_frame(d=Total[ Total$interaction == type, ], vertices=Genes, directed=T) 
+    #set_graph_attr(NET,"interaction","controls-transport-of-chemical")
+    eval( parse( text=paste0('Graph$`', type, '` <- graph_from_data_frame(d=Total[ Total$interaction == \'', type, '\', ], vertices=Genes, directed=T) ') ) )
+  }
+  #Edge Sum is 1903389
+  
+  #Another way to make the Network object But has multiple edges per-Vertex set
+  net_oldStyle <- graph_from_data_frame(d=Total, vertices=Genes, directed=T) 
+  return( list( DF=Total, NET=net_oldStyle, Gra=Graph ) )
 }
 
-Total <- do.call(rbind, total)
-Total <- Total[ , c("V1", "V3", "V2", "Pathway") ]
-colnames(Total) <- c("from", "to", "interaction", "pathway")
+Data <- Loader(SIFs)
+Total <- Data$DF
+net_oldStyle <- Data$NET
+Graph <- Data$Gra
 
-#Caluclate how many times this intereactcion was found in all databases:
-Total$Occurance <- paste0( Total$from, '-', Total$to, ':', Total$interaction )
-foo <- paste0( Total$from, '-', Total$to, ':', Total$interaction )
-TabFoo <- table(foo)
-Total$Occurance <-  as.numeric( TabFoo[ Total$Occurance ] )
-
-Genes <- c( as.character(Total$from), as.character(Total$to) )
-Genes <- Genes[ !duplicated(Genes) ]
-Genes <- as.data.frame( Genes )
-
-#Make the pathway column into a list object
-#library(dplyr)
-#library(reshape)
-
-library(data.table)
-Total$UniqCol <- paste0( as.character(Total$from),':', as.character(Total$to),'-', as.character(Total$interaction) )
-dt <- data.table(Total[, c('UniqCol','pathway')])
-DT <- dt[,lapply(.SD, function(col) paste(col, collapse=", ")), by=.(UniqCol)]
-
-sinl<-DT
-
-foo <- as.data.frame( DT )
-poo <- as.list( strsplit(as.character(foo$pathway),',') )
-names(poo) <- foo$UniqCol
-
-totals <- Total[ !duplicated(Total$UniqCol), ]
-pathways <- poo
-
-table(names(pathways) == as.character(totals$UniqCol))
-table( as.character(totals$UniqCol) == names(pathways) )
-
-totals$PATH <- pathways
-totals$PATH <- lapply( totals$PATH,
-               function(x) gsub(" ","", x)
-             )
-
-Total <- totals[,c("from", "to", "interaction", "Occurance", "UniqCol", "PATH")]
-colnames(Total) <- c("from", "to", "interaction", "Occurance", "UniqCol", "pathway")
-
-#Make into a network graph
-#Make into a network graph
-
-Graph <- list()
-for(type in levels(Total$interaction) ){
-  #NET <- graph_from_data_frame(d=Total[ Total$interaction == type, ], vertices=Genes, directed=T) 
-  #set_graph_attr(NET,"interaction","controls-transport-of-chemical")
-  eval( parse( text=paste0('Graph$`', type, '` <- graph_from_data_frame(d=Total[ Total$interaction == \'', type, '\', ], vertices=Genes, directed=T) ') ) )
-}
-#Edge Sum is 1903389
-
-#Make a network object (! This only has single edge types per-vertex !)
-net_oldStyle <- igraph::disjoint_union( Graph$`interacts-with`,
-               Graph$`in-complex-with`,
-               Graph$`catalysis-precedes`,
-               Graph$`chemical-affects`,
-               Graph$`consumption-controlled-by`,
-               Graph$`controls-expression-of`,
-               Graph$`controls-production-of`,
-               Graph$`controls-state-change-of`,
-               Graph$`reacts-with`,
-               Graph$`used-to-produce`,
-               Graph$`controls-phosphorylation-of`,
-               Graph$`controls-transport-of`,
-               Graph$`controls-transport-of-chemical`
-             )
+Tot <- 0
 for(type in levels(Total$interaction) ){
   message( paste0( type, ": ", eval(parse(text=paste0(  'length(E(Graph$`', type, '`))' ))) ))
+  Tot <- eval(parse(text=paste0( 'length(E(Graph$`', type, '`))') ))+Tot
 }
+message( paste0( "Total Interactions = ", Tot ) )
 
-#Edge Sum is 1903389
-length(E(net_oldStyle))
-
-#Another way to make the Network object But has multiple edges per-Vertex set
-net_oldStyle <- graph_from_data_frame(d=Total, vertices=Genes, directed=T) 
 
 #_# Test Code
 #@sk:All interactions of our interested partners
@@ -194,8 +191,38 @@ Trial.path <- induced_subgraph( net_oldStyle, colnames(do.call( rbind, news.path
 igraph::plot.igraph(Trial.path, edge.arrow.size=.4)
 
 # Get the vertecies of N Gene Ids
+####################################################################################
+MoesinScores <- data.table::fread(syn_temp$get('syn21652325')$path)
+MoesinGenes <- MoesinScores$GeneName
+GeneSetA <- c( "A1BG", "ABCC5", "ABI1", "ABI1", "ABI2", "ACACA", "PIK3R1", "PIK3CA" )
+
+
+#Subgraph:
 Trial.path <- induced_subgraph( net_oldStyle, c( "A1BG", "ABCC5", "ABI1", "ABI1", "ABI2", "ACACA", "PIK3R1", "PIK3CA" ) )
-#Trial.path <- induced_subgraph( net_oldStyle, c( "APOE", "APOC1", "TREM2", "EED", "KNOP1", "CD2AP", "MTCH2", "CEACAM19", "CLPTM1" ) )
+
+GS <- MoesinGenes
+message( paste0( length( GS[ GS%in% names(V(net_oldStyle)) ] ), ' of ', length( GS ), ' genes found in the Network' ))
+
+Trial.path <- induced_subgraph( net_oldStyle, GS[ GS%in% names(V(net_oldStyle)) ] )
+
+Trial.path <- make_ego_graph(net_oldStyle,
+                  order = 5,
+                  nodes = V(net_oldStyle)[names(V(net_oldStyle))[ names(V(net_oldStyle)) %in% names(V(Trial.path)) ]],
+                  mode = c("all"),
+                  mindist = 0)
+
+paste0( 'Trial.path[[', c(1:length(Trial.path)) , ']],' )
+
+
+NewTrial <- paste0( paste0( 'Trial.path[[', c(1:(1-length(Trial.path))), ']] %u% '  ), Trial.path[[ length(Trial.path) ]]  )
+NewTrial <- eval(parse( text=paste0( 'igraph::union(', 
+                                     paste0( 'Trial.path[[', c(1:length(Trial.path)), ']],' ), 
+                                     'byname = \'auto\')' )))
+                        
+                                     #paste0( 'Trial.path[[', (length(Trial.path)) , ']] )' )) ))
+
+
+message( paste0( length(E(Trial.path)), ' direct edges found between ', length(V(Trial.path)), ' nodes'))
 
 #Graph Object
 Trial.OBJ <- make_ego_graph(net_oldStyle, order = 8, nodes = c( "APOE", "APOC1", "TREM2", "EED", "KNOP1", "CD2AP", "MTCH2", "CEACAM19", "CLPTM1" ), mode = c("all"), mindist = 0)
@@ -206,11 +233,7 @@ Grabber <- function( Input ){
 }
 
 ####################
-
-
 #foo <- do.call( Grabber, Trial.OBJ)
-
-
 igraph::plot.igraph(Trial.path, edge.arrow.size=.4)
 
 #Color the Edges Based on interaction type
@@ -225,14 +248,15 @@ pie(rep(1,n), col=sample(col_vector, n))
 Colors <- sample(col_vector, n)
 names(Colors) <- Inters
 
-#Use Verticies
+# Use Verticies
 MiniNet <- Trial.path #induced.subgraph( Trial.path, as_ids(news.path$vpath[[1]]) )
 MiniNet <- MiniNet %>%
   set_edge_attr("color", value = c( Colors[ c(E(Trial.path)$interaction) ]) )
 
 plot( MiniNet, edge.arrow.size=.45 )
 
-####Color the Edges Based on INTERACTION TYPE, EDGE OCCURENCE AMONG THE USER SELECTED PATHWAYS, 
+####Color the Edges Based on INTERACTION TYPE, EDGE OCCURENCE AMONG THE USER SELECTED PATHWAYS,
+
 
   #Choose Colors
 Inters <- E(net_oldStyle)$interaction
@@ -277,7 +301,10 @@ MiniNet <- MiniNet %>%
 par(xpd=TRUE)
 environment(plot.igraph2) <- asNamespace('igraph')
 environment(igraph.Arrows2) <- asNamespace('igraph')
-plot.igraph2(MiniNet,edge.arrow.size=E(MiniNet)$DirectionArrowSize/max(E(MiniNet)$DirectionArrowSize)/2,edge.arrow.width=E(MiniNet)$DirectionArrowSize/max(E(MiniNet)$DirectionArrowSize))
+plot.igraph2(MiniNet,edge.arrow.size=E(MiniNet)$DirectionArrowSize/max(E(MiniNet)$DirectionArrowSize)/2,
+             edge.arrow.width=E(MiniNet)$DirectionArrowSize/max(E(MiniNet)$DirectionArrowSize),
+             edge.width = E(MiniNet)$weight,
+             vertex.size=5)
 #plot( MiniNet, edge.width = E(MiniNet)$weight, edge.arrow.size= .4) #E(MiniNet)$DirectionArrowSize )   #.4 )E(graph)$direction)
 legend('topleft', legend=names(Colors), 
        title.adj = 0.1,
@@ -292,12 +319,14 @@ legend("topright",
        title="Pathway Redundancy")
 mtext( paste0( "Pathways Examined: ", paste(toMatch, collapse = ', ')), 1 )
 
+
 #################################################################
 #Convert Network into Cytoscape Object:
 source('~/igraph_Network_Expansion/NetworkAnalysis/cytoscape_util.R')
 
-port.number = 8787
-base.url = paste("http://localhost:", toString(port.number), "/v1", sep="")
+port.number = 8080
+#base.url = paste("http://localhost:", toString(port.number), "/v1", sep="")
+base.url = paste("http://10.5.24.198:", toString(port.number), "/v1", sep="")
 print(base.url)
 
 setInternet2(TRUE)
@@ -308,9 +337,33 @@ send2cy(cygraph, 'default%20black', 'circular')
 
 
 
+# https://github.com/cytoscape/cytoscape/releases/download/3.7.2/Cytoscape_3_7_2_unix.sh
+# chmod u+x  Cytoscape_3_7_2_unix.sh
 
+#No suitable Java Virtual Machine could be found on your system.
+#The version of the JVM must be at least 1.8.0_152 and at most 9.
+#Please define INSTALL4J_JAVA_HOME to point to a suitable JVM.
 
+## java -version
+# sh Cytoscape_3_7_2_unix.sh      # local installation
+# sudo sh Cytoscape_3_7_2_unix.sh
 
 ############################# XXXXX #############################
+#TRASH
 
+#Make a network object (! This only has single edge types per-vertex !)
+net <- igraph::disjoint_union( Graph$`interacts-with`,
+               Graph$`in-complex-with`,
+               Graph$`catalysis-precedes`,
+               Graph$`chemical-affects`,
+               Graph$`consumption-controlled-by`,
+               Graph$`controls-expression-of`,
+               Graph$`controls-production-of`,
+               Graph$`controls-state-change-of`,
+               Graph$`reacts-with`,
+               Graph$`used-to-produce`,
+               Graph$`controls-phosphorylation-of`,
+               Graph$`controls-transport-of`,
+               Graph$`controls-transport-of-chemical`
+             )
 ```

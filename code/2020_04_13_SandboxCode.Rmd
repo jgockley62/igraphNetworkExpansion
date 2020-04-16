@@ -205,6 +205,14 @@ message( paste0( length( GS[ GS%in% names(V(net_oldStyle)) ] ), ' of ', length( 
 
 Trial.path <- induced_subgraph( net_oldStyle, GS[ GS%in% names(V(net_oldStyle)) ] )
 
+######Cluster the Total Graph
+Clust <- cluster_optimal(net_oldStyle, weights = NULL)
+
+
+
+
+
+
 Trial.path <- make_ego_graph(net_oldStyle,
                   order = 5,
                   nodes = V(net_oldStyle)[names(V(net_oldStyle))[ names(V(net_oldStyle)) %in% names(V(Trial.path)) ]],

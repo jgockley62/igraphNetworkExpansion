@@ -16,6 +16,8 @@ library(clusterProfiler)
 library(parallel)
 library(doParallel)
 library(RColorBrewer)
+devtools::install_github("jhrcook/HotNetvieweR")
+library(HotNetvieweR)
 source('igraphhack/igraphplot2.R')
 ```
 
@@ -180,9 +182,12 @@ fun$Extra <- paste0( as.character(fun$from), ':', as.character(fun$to) )
 table(table(fun$Extra))
 
 #Get the shortest path...
-news.path <- shortest_paths(net_oldStyle, 
-                                from = V(net_oldStyle)["PIK3CA"], 
-                                to  = V(net_oldStyle)["PIK3R1"],
+remove <- names(V(net_oldStyle))[ grepl( 'CHEBI:', names(V(net_oldStyle)) ) ==T ]
+Slim <- delete_vertices( net_oldStyle, remove )
+
+news.path <- shortest_paths( Slim, 
+                                from = V(Slim)["SMOC1"], 
+                                to  = V(Slim)["SORL1"],
                                 mode = "all",
                                 output = c('both')
                             )# both path nodes and edges
@@ -196,22 +201,109 @@ MoesinScores <- data.table::fread(syn_temp$get('syn21652325')$path)
 MoesinGenes <- MoesinScores$GeneName
 GeneSetA <- c( "A1BG", "ABCC5", "ABI1", "ABI1", "ABI2", "ACACA", "PIK3R1", "PIK3CA" )
 
-
 #Subgraph:
-Trial.path <- induced_subgraph( net_oldStyle, c( "A1BG", "ABCC5", "ABI1", "ABI1", "ABI2", "ACACA", "PIK3R1", "PIK3CA" ) )
+Trial.path <- induced_subgraph( net_oldStyle, c( "SMOC1", "MSN", "TREM2",  "APP" ) )
 
 GS <- MoesinGenes
 message( paste0( length( GS[ GS%in% names(V(net_oldStyle)) ] ), ' of ', length( GS ), ' genes found in the Network' ))
 
 Trial.path <- induced_subgraph( net_oldStyle, GS[ GS%in% names(V(net_oldStyle)) ] )
 
+#############################################################################################################################
 ######Cluster the Total Graph
-Clust <- cluster_optimal(net_oldStyle, weights = NULL)
+devtools::install_github("igraph/rigraph")
+
+#Potential Weights For Clustering....
+Total$EdgeRep <- 0
+Total$Edge <- paste0( Total$from, ':',  Total$to )
+key <- table( Total$Edge )
+Total$EdgeRep <- key[ Total$Edge ]
+
+Total_Occurence <- rep( 0, length(names(key)) )
+names( Total_Occurence ) <- names(key)
+
+SumTally <- function( name,df ){
+  Value <- sum( df[ df$Edge == name, ]$Occurance )
+  return(c(name,Value))
+}
+
+for( name in names(Total_Occurence)){
+  Total_Occurence[name] <- SumTally( name,Total )
+}
+
+Total$SumOccurence <- Total_Occurence[ Total$Edge ]
+
+cl <- makeCluster( detectCores()-2 )
+registerDoParallel(cl)
+TOs <- foreach( i=names(Total_Occurence)[1:5], .combine=rbind ) %dopar% SumTally( i,Total )
+stopCluster(cl)
 
 
 
+#############################################################################################################################
+  
+# Some Dependency not incl-Clust <- cluster_optimal(net_oldStyle, weights = NULL)
+net_undirected <- as.undirected(net_oldStyle)
+simpnet_undirected <- igraph::simplify(net_undirected)
+
+# Remove vertices that 
+remove <- names(V(net_undirected))[ grepl( 'CHEBI:', names(V(net_undirected)) ) ==T ]
+slim <- delete_vertices( simpnet_undirected, remove )
+
+# Fast/Greedy CLUSTERING
+Clust_fg <- cluster_fast_greedy(slim, merges = TRUE, modularity = TRUE, membership = TRUE, weights = NULL)
+
+message( paste0( "Found ", length(Clust_fg), " Clusters" ) )
+
+for( i in 1:length(Clust_fg) ){
+  #message( paste0( "Cluster ", i, " contains ", length(Clust_fg[[i]]), " Genes"))
+}
+
+modularity( Clust_fg )
+# 0.2767961
+
+Commun_fg <- igraph::communities( Clust_fg )
+
+# EIGEN CLUSTERING
+Clust_le <- cluster_leading_eigen(slim, steps = -1, weights = , start = NULL, options = arpack_defaults, callback = NULL, extra = NULL, env = parent.frame())
+
+message( paste0( "Found ", length(Clust_le), " Clusters" ) )
+
+for( i in 1:length(Clust_le) ){
+  #message( paste0( "Cluster ", i, " contains ", length(Clust_le[[i]]), " Genes"))
+}
+
+modularity( Clust_le )
+#0.2264285
 
 
+# Cluster Walktrap CLUSTERING
+Clust_wt <- cluster_walktrap(slim, weights = NULL, steps = 4,
+  merges = TRUE, modularity = TRUE, membership = TRUE)
+
+message( paste0( "Found ", length(Clust_wt), " Clusters" ) )
+
+for( i in 1:length(Clust_wt) ){
+ # message( paste0( "Cluster ", i, " contains ", length(Clust_wt[[i]]), " Genes"))
+}
+
+modularity( Clust_wt )
+#0.2531823
+
+# Cluster EDGE BETWEENESS CLUSTERING
+Clust_bt <- cluster_edge_betweenness(slim, weights = NULL, directed = TRUE, edge.betweenness = TRUE, merges = TRUE, bridges = TRUE, modularity = TRUE, membership = TRUE)
+
+
+
+#Clust_sg <- cluster_spinglass(simpnet_undirected, weights = NULL, vertex = NULL, spins = 25,
+#  parupdate = FALSE, start.temp = 1, stop.temp = 0.01,
+#  cool.fact = 0.99, update.rule = "random",
+#  gamma = 1, implementation = "orig", gamma.minus = 1)
+
+
+
+#-TOO INTENSIVE-girvan_newman <- cluster_edge_betweenness(net_oldStyle)
+modularity(Clust)
 
 Trial.path <- make_ego_graph(net_oldStyle,
                   order = 5,
@@ -240,7 +332,7 @@ Grabber <- function( Input ){
   return( temp )                   
 }
 
-####################
+#################### 
 #foo <- do.call( Grabber, Trial.OBJ)
 igraph::plot.igraph(Trial.path, edge.arrow.size=.4)
 
@@ -264,7 +356,6 @@ MiniNet <- MiniNet %>%
 plot( MiniNet, edge.arrow.size=.45 )
 
 ####Color the Edges Based on INTERACTION TYPE, EDGE OCCURENCE AMONG THE USER SELECTED PATHWAYS,
-
 
   #Choose Colors
 Inters <- E(net_oldStyle)$interaction
@@ -333,16 +424,24 @@ mtext( paste0( "Pathways Examined: ", paste(toMatch, collapse = ', ')), 1 )
 source('~/igraph_Network_Expansion/NetworkAnalysis/cytoscape_util.R')
 
 port.number = 8080
-#base.url = paste("http://localhost:", toString(port.number), "/v1", sep="")
-base.url = paste("http://10.5.24.198:", toString(port.number), "/v1", sep="")
+base.url = paste("http://localhost:", toString(port.number), "/v1", sep="")
+base.url = paste("http://localhost:", toString(port.number),  sep="")
+
+#base.url = paste("http://10.5.24.198:", toString(port.number), "/v1", sep="")
+
+port.number = 8080
+#base.url = paste("http://10.5.24.198:", toString(port.number), sep="")
+base.url = paste("http://localhost:", toString(port.number),  sep="")
 print(base.url)
 
-setInternet2(TRUE)
 
-# Convert it into Cytosccape.js JSON
+### - NEED TO START CYTOSCAPE DOCKER CONTAINER AND NETWORK WITH Docker Compose  - ###
+###Convert it into Cytosccape.js JSON
 cygraph <- toCytoscape( MiniNet )
+#[1] "Done.  To json Start..."
 send2cy(cygraph, 'default%20black', 'circular')
-
+#Error in curl::curl_fetch_memory(url, handle = handle) : 
+#  Recv failure: Connection reset by peer
 
 
 # https://github.com/cytoscape/cytoscape/releases/download/3.7.2/Cytoscape_3_7_2_unix.sh

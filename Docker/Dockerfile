@@ -3,7 +3,7 @@ FROM rocker/tidyverse:latest
 RUN apt-get update\
 && apt-get install -y libpython-dev\
 && apt-get install -y libpython3-dev\
-&& apt-get install -y dpkg-dev zlib1g-dev libssl-dev libffi-dev\
+&& apt-get install -y dpkg-dev zlib1g-dev libssl-dev libffi-dev libglpk-dev\
 && apt-get install -y curl nano less libcurl4-openssl-dev gawk\
 && apt-get install -y build-essential chrpath libssl-dev libxft-dev\
 && apt-get install -y libfreetype6 libfreetype6-dev\

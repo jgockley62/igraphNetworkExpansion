@@ -200,14 +200,25 @@ igraph::plot.igraph(Trial.path, edge.arrow.size=.4)
 MoesinScores <- data.table::fread(syn_temp$get('syn21652325')$path)
 MoesinGenes <- MoesinScores$GeneName
 GeneSetA <- c( "A1BG", "ABCC5", "ABI1", "ABI1", "ABI2", "ACACA", "PIK3R1", "PIK3CA" )
+GeneSetB <- c("CD44", "FLT1", "NTN1", "SFRP1", "STX4", "LACTB", "PVR", "ACE", "EPHX2", "RABEP1", "MADD", "APP", "MAPT")
 
 #Subgraph:
-Trial.path <- induced_subgraph( net_oldStyle, c( "SMOC1", "MSN", "TREM2",  "APP" ) )
+Trial.path <- induced_subgraph( net_oldStyle, GeneSetB )
 
-GS <- MoesinGenes
+GS <- GeneSetB
 message( paste0( length( GS[ GS%in% names(V(net_oldStyle)) ] ), ' of ', length( GS ), ' genes found in the Network' ))
 
 Trial.path <- induced_subgraph( net_oldStyle, GS[ GS%in% names(V(net_oldStyle)) ] )
+
+#Trial.path <- E(net_oldStyle)[ V(net_oldStyle)[ names(V(net_oldStyle)) %in% GS] ]
+Trial.path <- subgraph.edges( net_oldStyle, E(net_oldStyle)[ .inc(V(net_oldStyle)[GeneSetB])] )
+
+#Remove all CHEBI: nonsense
+Trial.path <- subgraph.edges( Trial.path, E(Trial.path)[ grepl( 'CHEBI', edge_attr(Trial.path)$UniqCol)  == F ] )
+
+
+##_#
+foo <- subgraph.edges( net_oldStyle, E(net_oldStyle)[ grepl( 'CHEBI', edge_attr(net_oldStyle)$UniqCol)  == F ] )
 
 #############################################################################################################################
 ######Cluster the Total Graph
@@ -227,45 +238,89 @@ SumTally <- function( name,df ){
   return(c(name,Value))
 }
 
-for( name in names(Total_Occurence)){
-  Total_Occurence[name] <- SumTally( name,Total )
+SumTally <- function( name,df ){
+  Value <- sum( df[ df$Edge == name, ]$Occurance )
+  return(c(name,Value))
 }
 
-Total$SumOccurence <- Total_Occurence[ Total$Edge ]
+temp_Total <- Total[ ,c('Edge','Occurance')]
+temp_Total$Occurance <- as.numeric(temp_Total$Occurance)
 
 cl <- makeCluster( detectCores()-2 )
 registerDoParallel(cl)
-TOs <- foreach( i=names(Total_Occurence)[1:5], .combine=rbind ) %dopar% SumTally( i,Total )
+
+L <- length(names(Total_Occurence))
+mark<-Sys.time()
+TOs <- foreach( i=names(Total_Occurence)[1:L], .combine=rbind, .export = ls(globalenv()) ) %dopar% SumTally( i,temp_Total )
+Sys.time()-mark
+# Time difference of 2.260386 days
+
 stopCluster(cl)
+sink_TO <-TOs
 
+row.names(TOs) <- TOs[,1]
+TOs <- as.data.frame(TOs)
+TOs$V2 <- as.numeric(as.character(TOs$V2))
+head(TOs[ Total$Edge, ])
 
+Total$SumOccurence <- TOs[ Total$Edge, ]$V2
 
+Genes <- c( as.character(Total$from), as.character(Total$to) )
+Genes <- Genes[ !duplicated(Genes) ]
+Genes <- as.data.frame( Genes )
+
+Graph <- list()
+for(type in levels(Total$interaction) ){
+    eval( parse( text=paste0('Graph$`', type, '` <- graph_from_data_frame(d=Total[ Total$interaction == \'', type, '\', ], vertices=Genes, directed=T) ') ) )
+}
+#Edge Sum is 1903389
+  
+#Another way to make the Network object But has multiple edges per-Vertex set
+net_oldStyle <- graph_from_data_frame(d=Total, vertices=Genes, directed=T) 
+Data <- list( DF=Total, NET=net_oldStyle, Gra=Graph )
 #############################################################################################################################
   
 # Some Dependency not incl-Clust <- cluster_optimal(net_oldStyle, weights = NULL)
-net_undirected <- as.undirected(net_oldStyle)
-simpnet_undirected <- igraph::simplify(net_undirected)
+net_undirected <- graph_from_data_frame(d=Total, vertices=Genes, directed=F) 
+# as.undirected(net_oldStyle)
+simpnet_undirected <- igraph::simplify(net_undirected, edge.attr.comb=list(interaction="ignore",
+                                                                           Occurance="median",
+                                                                           UniqCol="ignore",
+                                                                           pathway="ignore",
+                                                                           EdgeRep="median",
+                                                                           Edge="first",
+                                                                           SumOccurence="median"))
 
 # Remove vertices that 
 remove <- names(V(net_undirected))[ grepl( 'CHEBI:', names(V(net_undirected)) ) ==T ]
 slim <- delete_vertices( simpnet_undirected, remove )
 
 # Fast/Greedy CLUSTERING
-Clust_fg <- cluster_fast_greedy(slim, merges = TRUE, modularity = TRUE, membership = TRUE, weights = NULL)
+Clust_fg_EdgeRep <- cluster_fast_greedy(slim, merges = TRUE, modularity = TRUE, membership = TRUE, weights = E(slim)$EdgeRep)
 
-message( paste0( "Found ", length(Clust_fg), " Clusters" ) )
+Clust_fg_SumOccurence <- cluster_fast_greedy(slim, merges = TRUE, modularity = TRUE, membership = TRUE, weights = E(slim)$SumOccurence)
+
+Clust_fg_Occurance <- cluster_fast_greedy(slim, merges = TRUE, modularity = TRUE, membership = TRUE, weights = E(slim)$Occurance)
+
+message( paste0( "Found ", length(Clust_fg_EdgeRep), " Clusters" ) )
+message( paste0( "Found ", length(Clust_fg_SumOccurence), " Clusters" ) )
+message( paste0( "Found ", length(Clust_fg_Occurance), " Clusters" ) )
 
 for( i in 1:length(Clust_fg) ){
   #message( paste0( "Cluster ", i, " contains ", length(Clust_fg[[i]]), " Genes"))
 }
 
-modularity( Clust_fg )
+modularity( Clust_fg_Occurance )
 # 0.2767961
 
 Commun_fg <- igraph::communities( Clust_fg )
 
 # EIGEN CLUSTERING
-Clust_le <- cluster_leading_eigen(slim, steps = -1, weights = , start = NULL, options = arpack_defaults, callback = NULL, extra = NULL, env = parent.frame())
+Clust_le_EdgeRep <- cluster_leading_eigen(slim, steps = -1, weights = E(slim)$EdgeRep, start = NULL, options = arpack_defaults, callback = NULL, extra = NULL, env = parent.frame())
+Clust_le_SumOccurence <- cluster_leading_eigen(slim, steps = -1, weights = E(slim)$SumOccurence, start = NULL, options = arpack_defaults, callback = NULL, extra = NULL, env = parent.frame())
+Clust_le_Occurance <- cluster_leading_eigen(slim, steps = -1, weights = E(slim)$Occurance, start = NULL, options = arpack_defaults, callback = NULL, extra = NULL, env = parent.frame())
+
+#_#-LEFT ON FRIDAY HERE JKG
 
 message( paste0( "Found ", length(Clust_le), " Clusters" ) )
 
@@ -381,7 +436,8 @@ Weights <- apply( sapply( E( Trial.path_Filt )$pathway, function(x) toMatch %in%
 )
 
   ## - Set Color and Weight Atributes
-MiniNet <- Trial.path_Filt #induced.subgraph( Trial.path, as_ids(news.path$vpath[[1]]) )
+#MiniNet <- Trial.path_Filt #induced.subgraph( Trial.path, as_ids(news.path$vpath[[1]]) )
+MiniNet <- Trial.path
 MiniNet <- MiniNet %>%
   # Old for pre-pathway selection - set_edge_attr("weight",  value = lengths(E(Trial.path_Filt)$pathway )/(2*max( lengths( E(Trial.path_Filt)$pathway ))) ) %>%
   set_edge_attr("weight",  value = Weights /(1.25**max( lengths( Weights ) )) ) %>% 

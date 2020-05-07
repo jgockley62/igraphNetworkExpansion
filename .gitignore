@@ -1,3 +1,7 @@
+code/*.tsv
+code/core*
+code/*.RData
+code/*.pdf
 Data/*
 code/2020_04_16_Progress.RData
 code/core.*

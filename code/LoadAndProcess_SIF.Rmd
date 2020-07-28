@@ -1,0 +1,360 @@
+---
+title: "2020_04_13_Sandbox_Code"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+setwd('~/igraph_Network_Expansion/')
+library(igraph)
+library(paxtoolsr)
+library(RJSONIO)
+library(httr)
+library(data.table)
+library(DOSE)
+library(org.Hs.eg.db)
+library(clusterProfiler)
+library(parallel)
+library(doParallel)
+library(RColorBrewer)
+devtools::install_github("jhrcook/HotNetvieweR")
+library(HotNetvieweR)
+source('igraphhack/igraphplot2.R')
+devtools::install_github("igraph/rigraph")
+```
+
+## R Import Data
+
+```{r Import}
+#Set up Synapse Data Pull
+setwd('~/igraph_Network_Expansion/')
+  ##Insert User Credentials here. DO NOT Save DO NOT push to git or docker hub
+User <- '< USER_ID >'
+Pass <- '< Password >'
+
+reticulate::use_python("/usr/bin/python", required = TRUE)
+synapseclient <- reticulate::import("synapseclient")
+syn_temp <- synapseclient$Synapse()
+syn_temp$login( User, Pass, '--rememberMe' )
+
+rm(User)
+rm(Pass)
+
+SIFs <- c('syn21914063',
+  'syn21914056',
+  'syn21914057',
+  'syn21914059',
+  'syn21914061',
+  'syn21914064',
+  'syn21914065',
+  'syn21914070',
+  'syn21914071',
+  'syn21914072',
+  'syn21914078',
+  'syn21914082',
+  'syn21914083',
+  'syn21914087',
+  'syn21914090',
+  'syn21914091',
+  'syn21914093',
+  'syn21914094',
+  'syn21914074'
+)
+
+names(SIFs) <- c( 'Detailed', 
+                  'bind', 
+                  'biogrid', 
+                  'corum', 
+                  'ctd',
+                  'dip',
+                  'drugbank',
+                  'hprd',
+                  'humancyc',
+                  'intacsyngnc',
+                  'msigdb',
+                  'netpath',
+                  'panther',
+                  'pathbank',
+                  'pid',
+                  'psp',
+                  'reactome',
+                  'reconx',
+                  'kegg'
+  )
+
+#Load and Add names: SIFs
+boot <- function( i ){
+  foo <- read.table( file=syn_temp$get( SIFs[i] )$path , header = F, sep='\t' )
+  foo$Pathway <- as.character( i ) 
+  return(foo)
+}
+
+Loader <- function( SIFs){
+  #'@SIFs An object that has SynID values and named for the database
+  ##  Each Syn ID is a SIF format file 
+  
+  total <- list()
+  Trial <- for( i in names(SIFs) ){
+    temp <- boot( i )
+    #eval(parse(text=paste0( 'total$', as.character(NAMES[i]), ' <- temp' )))
+    total[[i]] <- temp
+  }
+  
+  Total <- do.call(rbind, total)
+  Total <- Total[ , c("V1", "V3", "V2", "Pathway") ]
+  colnames(Total) <- c("from", "to", "interaction", "pathway")
+  
+  #Caluclate how many times this intereactcion was found in all databases:
+  Total$Occurance <- paste0( Total$from, '-', Total$to, ':', Total$interaction )
+  foo <- paste0( Total$from, '-', Total$to, ':', Total$interaction )
+  TabFoo <- table(foo)
+  Total$Occurance <-  as.numeric( TabFoo[ Total$Occurance ] )
+  
+  Genes <- c( as.character(Total$from), as.character(Total$to) )
+  Genes <- Genes[ !duplicated(Genes) ]
+  Genes <- as.data.frame( Genes )
+  
+  #Make the pathway column into a list object
+  #library(dplyr)
+  #library(reshape)
+  
+  
+  Total$UniqCol <- paste0( as.character(Total$from),':', as.character(Total$to),'-', as.character(Total$interaction) )
+  dt <- data.table(Total[, c('UniqCol','pathway')])
+  DT <- dt[,lapply(.SD, function(col) paste(col, collapse=", ")), by=.(UniqCol)]
+  
+  sinl<-DT
+  
+  foo <- as.data.frame( DT )
+  poo <- as.list( strsplit(as.character(foo$pathway),',') )
+  names(poo) <- foo$UniqCol
+  
+  totals <- Total[ !duplicated(Total$UniqCol), ]
+  pathways <- poo
+  
+  table(names(pathways) == as.character(totals$UniqCol))
+  table( as.character(totals$UniqCol) == names(pathways) )
+  
+  totals$PATH <- pathways
+  totals$PATH <- lapply( totals$PATH,
+                 function(x) gsub(" ","", x)
+               )
+  
+  Total <- totals[,c("from", "to", "interaction", "Occurance", "UniqCol", "PATH")]
+  colnames(Total) <- c("from", "to", "interaction", "Occurance", "UniqCol", "pathway")
+  
+  #Make into a network graph
+  #Make into a network graph
+  
+  Graph <- list()
+  for(type in levels(Total$interaction) ){
+    #NET <- graph_from_data_frame(d=Total[ Total$interaction == type, ], vertices=Genes, directed=T) 
+    #set_graph_attr(NET,"interaction","controls-transport-of-chemical")
+    eval( parse( text=paste0('Graph$`', type, '` <- graph_from_data_frame(d=Total[ Total$interaction == \'', type, '\', ], vertices=Genes, directed=T) ') ) )
+  }
+  #Edge Sum is 1903389
+  
+  #Another way to make the Network object But has multiple edges per-Vertex set
+  net_oldStyle <- graph_from_data_frame(d=Total, vertices=Genes, directed=T) 
+  return( list( DF=Total, NET=net_oldStyle, Gra=Graph ) )
+}
+
+Data <- Loader(SIFs)
+Total <- Data$DF
+Total$from <- as.character(Total$from)
+Total$to <- as.character(Total$to)
+net_oldStyle <- Data$NET
+Graph <- Data$Gra
+
+Tot <- 0
+for(type in levels(Total$interaction) ){
+  message( paste0( type, ": ", eval(parse(text=paste0(  'length(E(Graph$`', type, '`))' ))) ))
+  Tot <- eval(parse(text=paste0( 'length(E(Graph$`', type, '`))') ))+Tot
+}
+message( paste0( "Total Interactions = ", Tot ) )
+
+
+#_# Test Code
+#@sk:All interactions of our interested partners
+#Total[ (Total$from =='PIK3R1' & Total$to=='PIK3CA') | (Total$from =='PIK3CA' & Total$to=='PIK3R1') , ]
+
+#@sk:Do we have multiple edge IDs:
+table( which_multiple(net_oldStyle, eids = E(net_oldStyle)) )
+#   FALSE    TRUE 
+# 1804977   98412
+#---# Yes We Do
+
+#@sk:
+fun<-Total
+fun$Extra <- paste0( as.character(fun$from), ':', as.character(fun$to) )
+table(table(fun$Extra))
+```
+
+
+```{r TotalOccurence }
+######Cluster the Total Graph
+
+Total <- Total[ grepl( 'CHEBI:', Total$UniqCol)==F , ]
+
+#Potential Weights For Clustering....
+Total$EdgeRep <- 0
+Total$Edge <- paste0( Total$from, ':',  Total$to )
+key <- table( Total$Edge )
+Total$EdgeRep <- key[ Total$Edge ]
+
+Total_Occurence <- rep( 0, length(names(key)) )
+names( Total_Occurence ) <- names(key)
+
+#SumTally <- function( name,df ){
+#  Value <- sum( df[ df$Edge == name, ]$Occurance )
+#  return(c(name,Value))
+#}
+
+SumTally <- function( name,df ){
+  Value <- sum( df[ df$Edge == name, ]$Occurance )
+  return(c(name,Value))
+}
+
+temp_Total <- Total[ ,c('Edge','Occurance')]
+temp_Total$Occurance <- as.numeric(temp_Total$Occurance)
+
+cl <- makeCluster( detectCores()-2 )
+registerDoParallel(cl)
+
+L <- length(names(Total_Occurence))
+mark<-Sys.time()
+TOs <- foreach( i=names(Total_Occurence)[1:L], .combine=rbind, .export = ls(globalenv()) ) %dopar% SumTally( i,temp_Total )
+Sys.time()-mark
+# Time difference of 2.260386 days #Rinst
+# Time difference of  days #BigMem
+stopCluster(cl)
+sink_TO <-TOs
+
+row.names(TOs) <- TOs[,1]
+TOs <- as.data.frame(TOs)
+TOs$V2 <- as.numeric(as.character(TOs$V2))
+head(TOs[ Total$Edge, ])
+
+Total$SumOccurence <- TOs[ Total$Edge, ]$V2
+
+Genes <- c( as.character(Total$from), as.character(Total$to) )
+Genes <- Genes[ !duplicated(Genes) ]
+Genes <- as.data.frame( Genes )
+
+#Graph <- list()
+#for(type in levels(Total$interaction) ){
+#    eval( parse( text=paste0('Graph$`', type, '` <- graph_from_data_frame(d=Total[ #Total$interaction == \'', type, '\', ], vertices=Genes, directed=T) ') ) )
+#}
+```
+
+## Load Partial Correlations into dataframe
+```{r TotalOccurence }
+library(biomaRt)
+library(foreach)
+ensembl <- useMart("ENSEMBL_MART_ENSEMBL", host = 'ensembl.org')
+ensembl <- useDataset('hsapiens_gene_ensembl', mart = ensembl)
+
+gene_ids <- c(Total$from, Total$to)[ !duplicated(c(Total$from, Total$to)) ]
+
+attrs <- c("ensembl_gene_id", "hgnc_symbol")
+Trans <- getBM(filters = 'hgnc_symbol',
+                            attributes = attrs,
+                            values = gene_ids,
+                            mart = ensembl )
+Trans$Uniq <- paste0( Trans$ensembl_gene_id, "_", Trans$hgnc_symbol)
+#row.names(Trans) <- Trans$hgnc_symbol
+
+Partials <- c('syn21898646', 'syn21630210', 'syn21986622', 'syn21785685', 'syn21911920', 'syn21986622' )
+names(Partials) <- c( 'TCX', 'DLPFC', 'IFG', 'PHG', 'STG', 'FP' )
+
+#Tiss <- 'TCX'
+cl <- parallel::makeCluster( parallel::detectCores()-2 )
+doParallel::registerDoParallel(cl)
+
+for( Tiss in names(Partials)){
+  Partials <- read.table( syn_temp$get( Partials[Tiss] )$path , header=T, sep ='\t')
+  Trans_filt <- Trans[ Trans$ensembl_gene_id %in% Partials$Hit.Gene, ]
+  
+  Initial <- dim(Trans_filt)[1]
+  Tossed_Genes <- length(names(table(Trans_filt$hgnc_symbol)[table(Trans_filt$hgnc_symbol) > 1]))
+  Trans_filt <- Trans_filt[ (Trans_filt$hgnc_symbol %in% names(table(Trans_filt$hgnc_symbol)[table(Trans_filt$hgnc_symbol) > 1])) == F, ]
+  Final <- dim(Trans_filt)[1]
+  message( paste0( "Genes tossed out of ", Tiss, " because of duplicate issues: ", Tossed_Genes))
+  message( paste0( "Row Reduction: ", Initial-Final, " Rows"))
+  
+  row.names(Trans_filt) <- Trans_filt$hgnc_symbol
+  Total$ENSG_TO <- NA
+  Total$ENSG_FROM <- NA
+  
+  Total$ENSG_TO <- Trans_filt[ Total$to, ]$ensembl_gene_id
+  Total$ENSG_FROM <- Trans_filt[ Total$from, ]$ensembl_gene_id
+  
+  eval(parse(text=paste0( 'Total$PtCor_', Tiss, ' <- ', NA )))
+  row.names(Partials) <- paste0(Partials$Hit.Gene,"_",Partials$Target.Gene)
+  
+  #Partials[ Partials$Hit.Gene == 'ENSG00000175899' & Partials$Target.Gene == 'ENSG00000121410',]
+  #Filter for speed?
+  mark<-Sys.time()
+  Partials_filt <- Partials[ row.names(Partials)[ ( row.names(Partials) %in% paste0(Total$ENSG_TO, '_', Total$ENSG_FROM) ) == T ] , ]
+  Sys.time()-mark
+  dim(Partials_filt)
+  
+  #save.image('2020_05_17_ReadyForAnote.RData')
+  PartialFinder <- function(ROW, Tiss, Parts){
+    #'@ROW a single row of the data frame Total
+    #eg. ROW <- Total[4,]
+    #'@Tiss tissue eg Tiss ('TCX')
+    #'@Parts a partial correlation matrix eg. Partials_filt
+    
+    Name <- paste0( ROW$ENSG_TO, '_', ROW$ENSG_FROM )
+    if( Name %in% row.names(Parts) ){
+      pCor <- Parts[ Name, ]$PartialCor
+    }else{
+      pCor <- NA
+    }
+    eval(parse(text=paste0( 'ROW$PtCor_', Tiss, ' <- pCor' )))
+    return( ROW )
+  }
+  #Run accross the DF
+  dim(Total)[1]
+  
+  mark<-Sys.time()
+  Temp <- foreach( i=1:5, .export = c("Tiss","Total","Partials_filt"), .combine = rbind ) %dopar% { PartialFinder( ROW=Total[i,], Tiss=Tiss, Parts= Partials_filt) }
+  Sys.time()-mark
+  
+  mark<-Sys.time()
+  Temp <- foreach( i=1:10, .export = c("Tiss","Total","Partials_filt"), .combine = rbind ) %dopar% { PartialFinder( ROW=Total[i,], Tiss=Tiss, Parts= Partials_filt) }
+  Sys.time()-mark
+  
+  mark<-Sys.time()
+  Temp <- foreach( i=1:20, .export = c("Tiss","Total","Partials_filt"), .combine = rbind ) %dopar% { PartialFinder( ROW=Total[i,], Tiss=Tiss, Parts= Partials_filt) }
+  Sys.time()-mark
+  
+mark<-Sys.time()
+  Temp <- foreach( i=1:40, .export = c("Tiss","Total","Partials_filt"), .combine = rbind ) %dopar% { PartialFinder( ROW=Total[i,], Tiss=Tiss, Parts= Partials_filt) }
+  Sys.time()-mark
+  
+mark<-Sys.time()
+  Temp <- foreach( i=1:80, .export = c("Tiss","Total","Partials_filt"), .combine = rbind ) %dopar% { PartialFinder( ROW=Total[i,], Tiss=Tiss, Parts= Partials_filt) }
+  Sys.time()-mark
+  
+ mark<-Sys.time()
+  Temp <- foreach( i=1:100, .export = c("Tiss","Total","Partials_filt"), .combine = rbind ) %dopar% { PartialFinder( ROW=Total[i,], Tiss=Tiss, Parts= Partials_filt) }
+  Sys.time()-mark 
+  
+mark<-Sys.time()
+  Temp <- foreach( i=1:200, .export = c("Tiss","Total","Partials_filt"), .combine = rbind ) %dopar% { PartialFinder( ROW=Total[i,], Tiss=Tiss, Parts= Partials_filt) }
+Sys.time()-mark
+  
+  mark<-Sys.time()
+  Temp <- foreach( i=1:dim(Total)[1], .export = c("Tiss","Total","Partials_filt"), .combine = rbind ) %dopar% { PartialFinder( ROW=Total[i,], Tiss=Tiss, Parts= Partials_filt) }
+  Sys.time()-mark
+  
+  
+  #Overwirte
+  Total <- Temp
+  #Erase the cache Table to save space
+  system( paste0( 'rm ', syn_temp$get( Partials[Tiss] )$path) )
+}
+parallel::stopCluster(cl)
+```

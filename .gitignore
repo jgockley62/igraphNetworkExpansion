@@ -1,3 +1,8 @@
+ReferenceData/*
+code/*.csv
+*.tsv
+*.RData
+2020_05_17_ReadyForAnote.RData
 code/*.tsv
 code/core*
 code/*.RData

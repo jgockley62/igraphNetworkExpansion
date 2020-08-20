@@ -34,6 +34,9 @@ synapseclient <- reticulate::import("synapseclient")
 syn_temp <- synapseclient$Synapse()
 syn_temp$login( User, Pass, '--rememberMe' )
 
+rm(User)
+rm(Pass)
+
 SIFs <- c('syn21914063',
   'syn21914056',
   'syn21914057',
@@ -251,13 +254,19 @@ registerDoParallel(cl)
 
 L <- length(names(Total_Occurence))
 mark<-Sys.time()
-TOs <- foreach( i=names(Total_Occurence)[1:L], .combine=rbind, .export = ls(globalenv()) ) %dopar% SumTally( i,temp_Total )
+#TOs <- foreach( i=names(Total_Occurence)[1:L], .combine=rbind, .export = ls(globalenv()) ) %dopar% SumTally( i,temp_Total )
+TOs <- foreach( i=names(Total_Occurence)[1:L], .combine=rbind ) %dopar% SumTally( i,temp_Total )
 Sys.time()-mark
 # Time difference of 2.260386 days
 
 stopCluster(cl)
+#TOs <- read.csv('../ReferenceData/Occurance.csv', row.names=1)
 sink_TO <-TOs
 
+#write to file
+#write.csv( temp_Total, file='../ReferenceData/Occurance.csv')
+#write.csv( TOs, file='../ReferenceData/SumTalliedOccur.csv')
+#TOs <- dplyr::distinct(TOs)
 row.names(TOs) <- TOs[,1]
 TOs <- as.data.frame(TOs)
 TOs$V2 <- as.numeric(as.character(TOs$V2))
@@ -274,125 +283,306 @@ for(type in levels(Total$interaction) ){
     eval( parse( text=paste0('Graph$`', type, '` <- graph_from_data_frame(d=Total[ Total$interaction == \'', type, '\', ], vertices=Genes, directed=T) ') ) )
 }
 #Edge Sum is 1903389
-  
+#save(Total, file = "../ReferenceData/Final_Total.tsv")
+#load("../ReferenceData/Final_Total.tsv")
 #Another way to make the Network object But has multiple edges per-Vertex set
 net_oldStyle <- graph_from_data_frame(d=Total, vertices=Genes, directed=T) 
 Data <- list( DF=Total, NET=net_oldStyle, Gra=Graph )
+
+```
+
+```{r PullCoExp}
+
 #############################################################################################################################
+#Add coexpression to the
+
+library("biomaRt")
+#dim(Total[ grepl('CHEBI', as.character(Total$UniqCol)) == F, ])
+Total <- Total[ grepl('CHEBI', as.character(Total$UniqCol)) == F, ]
+
+mart = useDataset("hsapiens_gene_ensembl", useEnsembl(biomart="ensembl", version=84))
+
+Genes <- c( as.character(Total$from), as.character(Total$to) )
+Genes <- Genes[ !duplicated(Genes) ]
+
+TRANS <- getBM(attributes=c('hgnc_symbol', 'ensembl_gene_id'), 
+      filters = 'hgnc_symbol', 
+      values = Genes, 
+      mart = mart)
+
+library(dplyr)
+Pull_CoExp <- function( Data, SynID, trans, DF){
+  #'@Data Character vector of the Brain Region eg. 'DLPFC'
+  #'@SynID SynID of the coexpression matrix eg. 'syn21630206'
+  #'@trans gene name to ensg dataframe for DF eg. TRANS
+  #'@DF The network dataframe eg Total
   
-# Some Dependency not incl-Clust <- cluster_optimal(net_oldStyle, weights = NULL)
-net_undirected <- graph_from_data_frame(d=Total, vertices=Genes, directed=F) 
-# as.undirected(net_oldStyle)
-simpnet_undirected <- igraph::simplify(net_undirected, edge.attr.comb=list(interaction="ignore",
-                                                                           Occurance="median",
-                                                                           UniqCol="ignore",
-                                                                           pathway="ignore",
-                                                                           EdgeRep="median",
-                                                                           Edge="first",
-                                                                           SumOccurence="median"))
-
-# Remove vertices that 
-remove <- names(V(net_undirected))[ grepl( 'CHEBI:', names(V(net_undirected)) ) ==T ]
-slim <- delete_vertices( simpnet_undirected, remove )
-
-# Fast/Greedy CLUSTERING
-Clust_fg_EdgeRep <- cluster_fast_greedy(slim, merges = TRUE, modularity = TRUE, membership = TRUE, weights = E(slim)$EdgeRep)
-
-Clust_fg_SumOccurence <- cluster_fast_greedy(slim, merges = TRUE, modularity = TRUE, membership = TRUE, weights = E(slim)$SumOccurence)
-
-Clust_fg_Occurance <- cluster_fast_greedy(slim, merges = TRUE, modularity = TRUE, membership = TRUE, weights = E(slim)$Occurance)
-
-message( paste0( "Found ", length(Clust_fg_EdgeRep), " Clusters" ) )
-message( paste0( "Found ", length(Clust_fg_SumOccurence), " Clusters" ) )
-message( paste0( "Found ", length(Clust_fg_Occurance), " Clusters" ) )
-
-for( i in 1:length(Clust_fg) ){
-  #message( paste0( "Cluster ", i, " contains ", length(Clust_fg[[i]]), " Genes"))
+  #Data <- 'DLPFC'
+  #SynID <- 'syn21630206'
+  #trans <- TRANS
+  #DF <- Total[ , colnames(Total) != 'DLPFC_CE' ]
+  
+  #DLPFC
+  CoExp <- read.table(syn_temp$get(SynID)$path, header=T,sep='\t')
+  
+  #Filter trans for relevant ENSGs:
+  trans <- trans[ trans$ensembl_gene_id %in% colnames(CoExp), ]
+  
+  #Filter CoExp for relevant Genes:
+  CoExp_filt <- CoExp[ row.names(CoExp)[ row.names(CoExp) %in% trans$ensembl_gene_id],
+                       colnames(CoExp)[ colnames(CoExp) %in% trans$ensembl_gene_id]
+                       ]
+  #Make the Statistic Column:
+  eval(parse(text= paste0( 'DF$', Data, '_CE <- NA' ) ))
+  
+  #Split DF into unanotatable and need to be annotate:
+  Total_UA <- DF[ (as.character(DF$from) %in% trans$hgnc_symbol) == F | (as.character(DF$to) %in% trans$hgnc_symbol) == F, ]
+  Total_A <- DF[ (as.character(DF$from) %in% trans$hgnc_symbol) == T & (as.character(DF$to) %in% trans$hgnc_symbol) == T, ]
+  
+  # Melt the CoExpressed Filtered
+  row.names(trans) <- trans$ensembl_gene_id
+  row.names(CoExp_filt) <- trans[ row.names(CoExp_filt), ]$hgnc_symbol
+  colnames(CoExp_filt) <- trans[ colnames(CoExp_filt), ]$hgnc_symbol
+  
+  m<-as.matrix(CoExp_filt)
+  foo<-data.frame(col = rep(colnames(m), each = nrow(m)), 
+             row = rep(rownames(m), ncol(m)), 
+             value = as.vector(m))
+  
+  #Filter the coexpression for the pairs that matter ie not zero
+  foo %>% mutate_if(is.factor, as.character) -> foo2
+  
+  Final_Annote <- foo[ foo$value > 0,]
+  Final_Annote %>% mutate_if(is.factor, as.character) -> Final_Annote
+  
+  temp<-Final_Annote
+  temp <- temp[ temp$col != temp$row, ]
+  temp <- temp[,c(2,1,3)]
+  colnames(temp) <- c( 'col', 'row', 'value')
+  
+  Exp <- merge( Final_Annote, temp )
+  row.names(Exp) <- paste0( Exp$row, ':', Exp$col )
+  
+  #Split the Total_A (Annotate into zero and non-zero)
+  Total_Z <- Total_A[ (Total_A$Edge %in% row.names(Exp)) == F, ]
+  eval(parse(text=paste0( 'Total_Z$', Data,'_CE <- 0' ) ))
+  
+  Total_A <- Total_A[ Total_A$Edge %in% row.names(Exp), ]
+  eval(parse(text=paste0( 'Total_A$', Data, '_CE <- Exp[ Total_A$Edge, ]$value') ))
+  
+  #Merge the datasets
+  Total_CE <- dplyr::bind_rows( Total_A,Total_Z )
+  DF <- dplyr::bind_rows( Total_CE, Total_UA )
+  return(DF)
 }
 
-modularity( Clust_fg_Occurance )
-# 0.2767961
+CoExpression <- c( 'syn21630206', 'syn21592277', 
+                   'syn21655283', 'syn21965435', 
+                   'syn21785669', 'syn21911919', 
+                   'syn21898644' )
+names( CoExpression ) <- c( 'DLPFC', 'CBE', 
+                            'FP', 'IFG', 
+                            'PHG', 'STG', 
+                            'TCX' )
 
-Commun_fg <- igraph::communities( Clust_fg )
-
-# EIGEN CLUSTERING
-Clust_le_EdgeRep <- cluster_leading_eigen(slim, steps = -1, weights = E(slim)$EdgeRep, start = NULL, options = arpack_defaults, callback = NULL, extra = NULL, env = parent.frame())
-Clust_le_SumOccurence <- cluster_leading_eigen(slim, steps = -1, weights = E(slim)$SumOccurence, start = NULL, options = arpack_defaults, callback = NULL, extra = NULL, env = parent.frame())
-Clust_le_Occurance <- cluster_leading_eigen(slim, steps = -1, weights = E(slim)$Occurance, start = NULL, options = arpack_defaults, callback = NULL, extra = NULL, env = parent.frame())
-
-#_#-LEFT ON FRIDAY HERE JKG
-
-message( paste0( "Found ", length(Clust_le), " Clusters" ) )
-
-for( i in 1:length(Clust_le) ){
-  #message( paste0( "Cluster ", i, " contains ", length(Clust_le[[i]]), " Genes"))
+# Run accross all regions:
+for( i in 1:length(CoExpression) ) {
+  Total <- Pull_CoExp( names( CoExpression )[i], CoExpression[i], TRANS, Total )
 }
 
-modularity( Clust_le )
-#0.2264285
+sink_Total <- Total
 
+Total$Avg_Cortex_CE <- apply( Total[,c('DLPFC_CE', 'FP_CE', 'IFG_CE', 'PHG_CE', 'STG_CE', 'TCX_CE')], 1, mean )
 
-# Cluster Walktrap CLUSTERING
-Clust_wt <- cluster_walktrap(slim, weights = NULL, steps = 4,
-  merges = TRUE, modularity = TRUE, membership = TRUE)
+Total$Avg_All_CE <- apply( Total[,c('DLPFC_CE', 'CBE_CE', 'FP_CE', 'IFG_CE', 'PHG_CE', 'STG_CE', 'TCX_CE')], 1, mean )
 
-message( paste0( "Found ", length(Clust_wt), " Clusters" ) )
+sink_Total <- Total
+#save( Total, file='Total_Net_wCoexpression.RData' )
+#save.image('2020_08_13_CoexpAdd.RData')
 
-for( i in 1:length(Clust_wt) ){
- # message( paste0( "Cluster ", i, " contains ", length(Clust_wt[[i]]), " Genes"))
-}
+```
 
-modularity( Clust_wt )
-#0.2531823
+```{r MakeNet }
+#Try Cortex CE net:
+#Implement the edge_betweeness Algo:
+Total_Cor <- Total[ Total$Avg_Cortex_CE > 0,]
+#Total_Cor <- Total[ !is.na(Total$Avg_Cortex_CE) ,]
+Genes <- c( as.character(Total_Cor$from), as.character(Total_Cor$to) )
+Genes <- Genes[ !duplicated(Genes) ]
 
 # Cluster EDGE BETWEENESS CLUSTERING
-Clust_bt <- cluster_edge_betweenness(slim, weights = NULL, directed = TRUE, edge.betweenness = TRUE, merges = TRUE, bridges = TRUE, modularity = TRUE, membership = TRUE)
+##Directed Graph:
+
+######TEST
+#CACNA2D2:CACNG2
+Total_Cor <- Total[ !is.na(Total$Avg_Cortex_CE),]
+Total_Cor <- Total_Cor[ Total_Cor$Avg_Cortex_CE > 0,]
+#Total_Cor <- Total_Cor[1:1000,]
+Total_Cor$from <- as.factor(as.character(Total_Cor$from))
+Total_Cor$to <- as.factor(as.character(Total_Cor$to))
+Genes <- c( as.character(Total_Cor$from), as.character(Total_Cor$to) )
+Genes <- Genes[ !duplicated(Genes) ]
+
+Total_Cor$from <- as.character(Total_Cor$from)
+Total_Cor$to <- as.character(Total_Cor$to)
+head( apply( Total_Cor[,c('to','from')], 1, sort ) )
+Total_Cor$altUnique <- paste0( as.character(Total_Cor$to), ':', as.character(Total_Cor$from), '-', as.character(Total_Cor$interaction) )
+#Total_Cor <- Total_Cor[ (Total_Cor$altUnique %in% Total_Cor$UniqCol)==F ,]
+Total_Cor[ grepl( 'CACNA2D2:CACNG2', as.character(Total_Cor$UniqCol)) | grepl( 'CACNG2:CACNA2D2', as.character(Total_Cor$UniqCol)), ]
+
+#Remove reciprocate duplicates:
+tmp <- t(apply( Total_Cor[,c('to','from')], 1, sort ) ) 
+Total_Cor$altUnique <- paste0( as.character(tmp[,1]), ':', as.character(tmp[,2]), '-', as.character(Total_Cor$interaction) )
+Total_Cor<- Total_Cor[ !duplicated(Total_Cor$altUnique), ]
+Total_Cor[ , colnames(Total_Cor) != 'altUnique' ]
+
+#Make iGraph net and cluster
+net_undirected <- graph_from_data_frame(d=Total_Cor, vertices=Genes, directed=F) 
+# Louvain Clustering
+Start <- Sys.time()
+Clust_bt <- cluster_louvain(net_undirected, weights = E(net_undirected)$Avg_Cortex_CE)
+Sys.time()-Start
+
+#plot(net_undirected, mark.groups = Clust_bt)
 
 
+#James-Stein Estimator
+library(corpcor)
+foo <- as_adjacency_matrix(net_undirected, type = "upper", attr = "Avg_Cortex_CE", edges = FALSE, names = TRUE)#, sparse = igraph_opt("sparsematrices"))
 
-#Clust_sg <- cluster_spinglass(simpnet_undirected, weights = NULL, vertex = NULL, spins = 25,
-#  parupdate = FALSE, start.temp = 1, stop.temp = 0.01,
-#  cool.fact = 0.99, update.rule = "random",
-#  gamma = 1, implementation = "orig", gamma.minus = 1)
+foo.shrink <- cor.shrink(foo)
+#length(as.vector(foo)[as.vector(foo) >0])
+# 22634
+#length(as.vector(foo.shrink)[as.vector(foo.shrink) >0])
+# 272149
+#length(as.vector(foo.shrink)[as.vector(foo.shrink) != 0])
+# 61419829
+#length(as.vector(foo.shrink))
+#82755409
 
+DT <- data.frame(col = rep(colnames(foo.shrink), each = nrow(foo.shrink)), 
+             row = rep(rownames(foo.shrink), ncol(foo.shrink)), 
+             value = as.vector(foo.shrink))
+DT %>% mutate_if(is.factor, as.character) -> DT
+row.names(DT) <- paste0( DT[,1], ':', DT[,2] )
 
+Total_Cor$JS <- DT[ Total_Cor$Edge, ] 
 
-#-TOO INTENSIVE-girvan_newman <- cluster_edge_betweenness(net_oldStyle)
-modularity(Clust)
+#Make iGraph net and cluster
+JS_net_undirected <- graph_from_data_frame(d=Total_Cor, vertices=Genes, directed=F) 
+# Louvain Clustering
+Start <- Sys.time()
+JS_Clust_bt <- cluster_louvain(JS_net_undirected, weights = E(net_undirected)$JS)
+Sys.time()-Start
 
-Trial.path <- make_ego_graph(net_oldStyle,
-                  order = 5,
-                  nodes = V(net_oldStyle)[names(V(net_oldStyle))[ names(V(net_oldStyle)) %in% names(V(Trial.path)) ]],
-                  mode = c("all"),
-                  mindist = 0)
+compare( JS_Clust_bt, Clust_bt, method="vi")
+compare( JS_Clust_bt, Clust_bt, method="nmi")
+compare( JS_Clust_bt, Clust_bt, method="split.join")
+compare( JS_Clust_bt, Clust_bt, method="rand")
+compare( JS_Clust_bt, Clust_bt, method="adjusted.rand")
 
-paste0( 'Trial.path[[', c(1:length(Trial.path)) , ']],' )
+##Look at Jesse's Kinases:
+Small <- c( 'AXL', 'CERK', 'NME3', 'AATK', 'SRC', 'LTK', 'JAK1', 'PKCA' )
+small <- Small[ Small %in% names(V(JS_net_undirected)) ]
+#names(V(JS_net_undirected))[ grepl( 'PKC', names(V(JS_net_undirected)) ) ]
 
+Big <- c("AXL", "CERK", "TSSK3", "AATK", "NME3", "PANK4", "SNX16", "STRADB", "JAK2", "NEK11", "MAST1", "MAPKAPK3", "MINK1", "PKMYT1", "TESK2", "CSNK1G3", "EPHA10", "TIE1", "TRRAP", "AGK", "SIK3", "GSK3A", "MELK", "MAP4K5", "DYRK4", "PRKCA", "NEK1", "DYRK1A", "CSF1R", "GK2", "MAGI2", "MAST2", "TESK1", "MAP3K4", "BCKDK", "SRC", "AURKB", "NTRK3", "MST1R", "STK11", "FGR", "PLXNA1", "MAPKAPK5", "JAK1", "LTK")
+big <- Big[ Big %in% names(V(JS_net_undirected)) ]
+#Big[ (Big %in% names(V(JS_net_undirected)))==F ]
 
-NewTrial <- paste0( paste0( 'Trial.path[[', c(1:(1-length(Trial.path))), ']] %u% '  ), Trial.path[[ length(Trial.path) ]]  )
-NewTrial <- eval(parse( text=paste0( 'igraph::union(', 
-                                     paste0( 'Trial.path[[', c(1:length(Trial.path)), ']],' ), 
-                                     'byname = \'auto\')' )))
-                        
-                                     #paste0( 'Trial.path[[', (length(Trial.path)) , ']] )' )) ))
+#Expand the big geneset:
+temp <- DT[ (DT$col %in% big | DT$row %in% big) & DT$value > 0.001, ]
+poo<-c(temp$col,temp$row)
+poo <- poo[!duplicated(poo)]
 
-
-message( paste0( length(E(Trial.path)), ' direct edges found between ', length(V(Trial.path)), ' nodes'))
-
-#Graph Object
-Trial.OBJ <- make_ego_graph(net_oldStyle, order = 8, nodes = c( "APOE", "APOC1", "TREM2", "EED", "KNOP1", "CD2AP", "MTCH2", "CEACAM19", "CLPTM1" ), mode = c("all"), mindist = 0)
-
-Grabber <- function( Input ){
-  temp<-as_data_frame(Input, what = c("edges", "vertices", "both") )
-  return( temp )                   
+#####################################
+#Look for enrichment in JS cluster object
+Vect <- rep(NA, length(JS_Clust_bt))
+for( i in 1:length(JS_Clust_bt) ){
+  PVal <- pbinom(length( big[ big %in% JS_Clust_bt[[i]] ] ), 
+       size=length(JS_Clust_bt[[i]] ), 
+       prob=length(big)/length( V(JS_net_undirected)),
+       lower.tail = F
+  )
+  Vect[i] <- PVal
 }
 
+Vect_cor <- p.adjust(Vect, method='fdr', n=length(Vect) )
+
+message( paste0('Minimum P-Val of Geneset Enrichment in a module: ',  min(Vect) ))
+N <- which( Vect == min(Vect) )
+JS_Clust_bt[[N]]
+
+
+Vect <- rep(NA, length(JS_Clust_bt))
+for( i in 1:length(JS_Clust_bt) ){
+  PVal <- pbinom(length( poo[ poo %in% JS_Clust_bt[[i]] ] ), 
+       size=length(JS_Clust_bt[[i]] ), 
+       prob=length(poo)/length( V(JS_net_undirected)),
+       lower.tail = F
+  )
+  Vect[i] <- PVal
+}
+
+Vect_cor <- p.adjust(Vect, method='fdr', n=length(Vect) )
+
+message( paste0('Minimum P-Val of Geneset Enrichment in a module: ',  min(Vect) ))
+#N <- which( Vect == min(Vect[ Vect != min(Vect)]) )
+N <- which( Vect == min(Vect) )
+
+JS_Clust_bt[[N]]
+
+table( poo %in% JS_Clust_bt[[N]] )
+table( big %in% JS_Clust_bt[[N]] )
+
+##############################################################################
+#Non-JS
+vect <- rep(NA, length(Clust_bt))
+for( i in 1:length(Clust_bt) ){
+  PVal <- pbinom( length( big[ big %in% Clust_bt[[i]] ] ), 
+       size=length(Clust_bt[[i]] ), 
+       prob=length(big)/length( V(net_undirected)),
+       lower.tail = F
+  )
+  vect[i] <- PVal
+}
+
+message( paste0('Minimum P-Val of Geneset Enrichment in a module: ',  min(vect) ))
+n <- which(  vect == min(vect) )
+Clust_bt[[n]]
+
+vect_cor <- p.adjust(vect, method='fdr', n=length(vect) )
+
+vect <- rep(NA, length(Clust_bt))
+for( i in 1:length(Clust_bt) ){
+  PVal <- pbinom( length( poo[ poo %in% Clust_bt[[i]] ] ), 
+       size=length(Clust_bt[[i]] ), 
+       prob=length(poo)/length( V(net_undirected)),
+       lower.tail = F
+  )
+  vect[i] <- PVal
+}
+vect_cor <- p.adjust(vect, method='fdr', n=length(vect) )
+
+#which( vect_cor < 0.05 )
+message( paste0('Minimum P-Val of Geneset Enrichment in a module: ',  min(vect) ))
+nn <- which(  vect == min(vect) )
+Clust_bt[[nn]]
+
+table( poo %in% Clust_bt[[nn]] )
+table( big %in% Clust_bt[[nn]] )
+##Kinases not in graph: "TSSK3", "SNX16", "NEK11", "MINK1", "PKMYT1", "TESK2", "MELK", "DYRK4", "GK2", "MAGI2", "MAST2", "TESK1", "AURKB", "MAPKAPK5"
+
+
 #################### 
-#foo <- do.call( Grabber, Trial.OBJ)
+## Get subgraph & plot
+Keep = names(V(JS_net_undirected))[ names(V(JS_net_undirected)) %in% JS_Clust_bt[[131]] ]#c( JS_Clust_bt[[N]], JS_Clust_bt[[131]]) ]
+Trial.path <- induced_subgraph(JS_net_undirected, Keep)
+
 igraph::plot.igraph(Trial.path, edge.arrow.size=.4)
 
 #Color the Edges Based on interaction type
-Inters <- E(net_oldStyle)$interaction
+Inters <- E(JS_net_undirected)$interaction
 Inters <- Inters[ !duplicated(Inters) ]
 
 n <- length(Inters)
@@ -413,7 +603,7 @@ plot( MiniNet, edge.arrow.size=.45 )
 ####Color the Edges Based on INTERACTION TYPE, EDGE OCCURENCE AMONG THE USER SELECTED PATHWAYS,
 
   #Choose Colors
-Inters <- E(net_oldStyle)$interaction
+Inters <- E(JS_net_undirected)$interaction
 Inters <- Inters[ !duplicated(Inters) ]
 
 n <- length(Inters)
@@ -529,4 +719,214 @@ net <- igraph::disjoint_union( Graph$`interacts-with`,
                Graph$`controls-transport-of`,
                Graph$`controls-transport-of-chemical`
              )
+```
+
+
+```{r old code, eval=F}
+
+
+
+
+Start <- Sys.time()
+Clust_bt <- cluster_label_prop(net_directed, weights = E(net_directed)$Avg_Cortex_CE)
+Sys.time()-Start
+
+
+#Leading Eigen
+Start <- Sys.time()
+Clust_bt <- cluster_leading_eigen(simpnet_undirected, weights = E(simpnet_undirected)$Avg_Cortex_CE)
+Sys.time()-Start
+#Fast and greedy
+net_undirected <- graph_from_data_frame(d=Total_Cor, vertices=Genes, directed=F) 
+
+simpnet_undirected <- igraph::simplify(net_undirected, edge.attr.comb=list(interaction="ignore",
+                                                                           Occurance="median",
+                                                                           UniqCol="ignore",
+                                                                           pathway="ignore",
+                                                                           EdgeRep="median",
+                                                                           Edge="first",
+                                                                           SumOccurence="median"))
+
+#Cluster Walk Trap
+#Clust_bt <- cluster_walktrap(net_directed, weights = E(net_directed)$Avg_Cortex_CE, steps = 30, merges = TRUE, modularity = TRUE, membership = TRUE)
+#27,729:  Time difference of 3.852172 secs
+modularity(Clust_bt)
+#[1] 0.6376457 - 4 steps
+#[1] 0.7302233 - 15 steps
+#[1] 0.7265575 - 30 steps
+length(Clust_bt)
+#[1] 1881 - 4 steps
+#[1] 744  - 15 steps
+#[1] 487 - 30 steps
+length(ModSiz[ModSiz>10])
+#[1] 84 - 4 steps
+#[1] 59 - 15 steps
+#[1] 30 - 30 steps
+
+#louvain
+#Clust_bt <- cluster_louvain(net_directed, weights = E(net_directed)$Avg_Cortex_CE)
+#Edges
+#27,729:      Time difference of 0.1426175 secs
+modularity(Clust_bt)
+#[1] 0.7683103
+length(Clust_bt)
+#[1] 174
+
+
+
+
+#Betweeness
+#Clust_bt <- cluster_edge_betweenness(net_directed, weights = E(net_directed)$Avg_Cortex_CE, directed = TRUE, edge.betweenness = TRUE, merges = TRUE, bridges = TRUE, modularity = TRUE, membership = TRUE)
+
+#Edges
+#100:      Time difference of 0.1548684 secs
+#1,000:    Time difference of 1.530578 secs
+#10,000:   Time difference of 5.353881 mins
+#15,000:   Time difference of 17.65911 mins
+#20,000:   Time difference of 46.51765 mins
+#27,729:   Time difference of 2.439785 hours
+
+ModSiz <- NULL
+for( i in 1:length(JS_Clust_bt) ){
+  ModSiz <- c(ModSiz, length(Clust_bt[[i]]))
+  #message( paste0( "Cluster ", i, " contains ", length(Clust_bt[[i]]), " Genes"))
+}
+> modularity(Clust_bt)
+#[1] 0.1978309
+
+length(ModSiz)
+#[1] 5070
+
+length( ModSiz[ ModSiz>10] )
+#[1] 10
+
+
+########
+
+
+#Total_Cor <- Total[ !is.na(Total$Avg_Cortex_CE) ,]
+Total_Cor <- Total[ Total$Avg_Cortex_CE > 0,]
+Genes <- c( as.character(Total_Cor$from), as.character(Total_Cor$to) )
+Genes <- Genes[ !duplicated(Genes) ]
+
+net_directed <- graph_from_data_frame(d=Total_Cor, vertices=Genes, directed=T) 
+
+Clust_bt <- cluster_edge_betweenness(net_directed, weights = E(net_directed)$Avg_Cortex_CE, directed = TRUE, edge.betweenness = TRUE, merges = TRUE, bridges = TRUE, modularity = TRUE, membership = TRUE)
+
+
+#net_undirected <- graph_from_data_frame(d=Total_Cor, vertices=Genes, directed=F) 
+
+# Some Dependency not incl-Clust <- cluster_optimal(net_oldStyle, weights = NULL)
+net_undirected <- graph_from_data_frame(d=Total[ Total$Avg_Cortex_CE > 0,], vertices=Genes, directed=F) 
+# as.undirected(net_oldStyle)
+simpnet_undirected <- igraph::simplify(net_undirected, edge.attr.comb=list(interaction="ignore",
+                                                                           Occurance="median",
+                                                                           UniqCol="ignore",
+                                                                           pathway="ignore",
+                                                                           EdgeRep="median",
+                                                                           Edge="first",
+                                                                           SumOccurence="median"))
+
+# Remove vertices that have Chemical ID interaction
+remove <- names(V(net_undirected))[ grepl( 'CHEBI:', names(V(net_undirected)) ) ==T ]
+slim <- delete_vertices( simpnet_undirected, remove )
+
+save(slim, file='../ReferenceData/Undirected_Network.RData')
+
+# Fast/Greedy CLUSTERING
+Clust_fg_EdgeRep <- cluster_fast_greedy(slim, merges = TRUE, modularity = TRUE, membership = TRUE, weights = E(slim)$Avg_Cortex_CE  )
+
+Clust_fg_EdgeRep <- cluster_fast_greedy(slim, merges = TRUE, modularity = TRUE, membership = TRUE, weights = E(slim)$EdgeRep)
+
+Clust_fg_SumOccurence <- cluster_fast_greedy(slim, merges = TRUE, modularity = TRUE, membership = TRUE, weights = E(slim)$SumOccurence)
+
+Clust_fg_Occurance <- cluster_fast_greedy(slim, merges = TRUE, modularity = TRUE, membership = TRUE, weights = E(slim)$Occurance)
+
+message( paste0( "Found ", length(Clust_fg_EdgeRep), " Clusters" ) )
+message( paste0( "Found ", length(Clust_fg_SumOccurence), " Clusters" ) )
+message( paste0( "Found ", length(Clust_fg_Occurance), " Clusters" ) )
+
+for( i in 1:length(Clust_fg_Occurance) ){
+  message( paste0( "Cluster ", i, " contains ", length(Clust_fg_Occurance[[i]]), " Genes"))
+}
+
+modularity( Clust_fg_Occurance )
+# 0.2767961
+
+Commun_fg <- igraph::communities( Clust_fg )
+
+# EIGEN CLUSTERING
+Clust_le_EdgeRep <- cluster_leading_eigen(slim, steps = -1, weights = E(slim)$EdgeRep, start = NULL, options = arpack_defaults, callback = NULL, extra = NULL, env = parent.frame())
+
+Clust_le_SumOccurence <- cluster_leading_eigen(slim, steps = -1, weights = E(slim)$SumOccurence, start = NULL, options = arpack_defaults, callback = NULL, extra = NULL, env = parent.frame())
+
+Clust_le_Occurance <- cluster_leading_eigen(slim, steps = -1, weights = E(slim)$Occurance, start = NULL, options = arpack_defaults, callback = NULL, extra = NULL, env = parent.frame())
+
+#_#-LEFT ON FRIDAY HERE JKG
+
+message( paste0( "Found ", length(Clust_le), " Clusters" ) )
+
+for( i in 1:length(Clust_le) ){
+  #message( paste0( "Cluster ", i, " contains ", length(Clust_le[[i]]), " Genes"))
+}
+
+modularity( Clust_le )
+#0.2264285
+
+
+# Cluster Walktrap CLUSTERING
+Clust_wt <- cluster_walktrap(slim, weights = NULL, steps = 4,
+  merges = TRUE, modularity = TRUE, membership = TRUE)
+
+message( paste0( "Found ", length(Clust_wt), " Clusters" ) )
+
+for( i in 1:length(Clust_wt) ){
+ # message( paste0( "Cluster ", i, " contains ", length(Clust_wt[[i]]), " Genes"))
+}
+
+modularity( Clust_wt )
+#0.2531823
+
+# Cluster EDGE BETWEENESS CLUSTERING
+Clust_bt <- cluster_edge_betweenness(slim, weights = NULL, directed = TRUE, edge.betweenness = TRUE, merges = TRUE, bridges = TRUE, modularity = TRUE, membership = TRUE)
+
+
+
+#Clust_sg <- cluster_spinglass(simpnet_undirected, weights = NULL, vertex = NULL, spins = 25,
+#  parupdate = FALSE, start.temp = 1, stop.temp = 0.01,
+#  cool.fact = 0.99, update.rule = "random",
+#  gamma = 1, implementation = "orig", gamma.minus = 1)
+
+
+
+#-TOO INTENSIVE-girvan_newman <- cluster_edge_betweenness(net_oldStyle)
+modularity(Clust)
+
+Trial.path <- make_ego_graph(net_oldStyle,
+                  order = 5,
+                  nodes = V(net_oldStyle)[names(V(net_oldStyle))[ names(V(net_oldStyle)) %in% names(V(Trial.path)) ]],
+                  mode = c("all"),
+                  mindist = 0)
+
+paste0( 'Trial.path[[', c(1:length(Trial.path)) , ']],' )
+
+
+NewTrial <- paste0( paste0( 'Trial.path[[', c(1:(1-length(Trial.path))), ']] %u% '  ), Trial.path[[ length(Trial.path) ]]  )
+NewTrial <- eval(parse( text=paste0( 'igraph::union(', 
+                                     paste0( 'Trial.path[[', c(1:length(Trial.path)), ']],' ), 
+                                     'byname = \'auto\')' )))
+                        
+                                     #paste0( 'Trial.path[[', (length(Trial.path)) , ']] )' )) ))
+
+
+message( paste0( length(E(Trial.path)), ' direct edges found between ', length(V(Trial.path)), ' nodes'))
+
+#Graph Object
+Trial.OBJ <- make_ego_graph(net_oldStyle, order = 8, nodes = c( "APOE", "APOC1", "TREM2", "EED", "KNOP1", "CD2AP", "MTCH2", "CEACAM19", "CLPTM1" ), mode = c("all"), mindist = 0)
+
+Grabber <- function( Input ){
+  temp<-as_data_frame(Input, what = c("edges", "vertices", "both") )
+  return( temp )                   
+}
+
 ```

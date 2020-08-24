@@ -1,0 +1,53 @@
+version: "3.3"
+
+services:
+
+  cyto:
+    image: biodepot/novnc-cynetworkbma:latest
+    expose:
+      - 6080
+    networks:
+      trial:
+    volumes:
+      - /home/jgockley/igraph_Network_Expansion:/home/jgockley/igraph_Network_Expansion
+    ports:
+      - "6080:6080"
+    env_file:
+      - /home/jgockley/igraph_Network_Expansion/dock.env
+    environment:
+      - APP_USERNAME=jgockley
+      - APP_PASSWORD_HASH=test
+
+  rstudio:
+    image: jgockley/igraphnetworkexpansion:Network
+    volumes:
+       - /home/jgockley/igraph_Network_Expansion:/home/jgockley/igraph_Network_Expansion
+    ports:
+      - "8787:8787"
+    environment:
+      - USER=jgockley
+      - PASSWORD=Test1!
+
+  caddy:
+    image: cyto-caddy:latest
+    networks:
+      trial:
+      outside-world:
+    volumes:
+      - ./caddy/Caddyfile:/etc/Caddyfile 
+      - /home/jgockley/igraph_Network_Expansion:/home/jgockley/igraph_Network_Expansion
+    ports:
+      - "6080:6080"
+    env_file:
+      - /home/jgockley/igraph_Network_Expansion/dock.env
+    environment:
+      - APP_USERNAME='${USER}'
+      - APP_PASSWORD_HASH=test
+      - name=igraph_network_expansion_cyto_1
+      - net=trial
+      - reverse_proxy_from=cyto:6080
+
+networks:
+  trial:
+    internal: true
+  outside-world:

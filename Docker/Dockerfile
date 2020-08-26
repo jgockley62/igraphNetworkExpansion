@@ -31,7 +31,7 @@ RUN apt-get update\
 && git clone https://github.com/jgockley62/igraph_Network_Expansion.git \
 && R -e "install.packages('BiocManager')"\
 && R -e "BiocManager::install('biomaRt')"\ 
-&& R -e "devtools::install_github('th1vairam/CovariateAnalysis@dev')"\ 
+#&& R -e "devtools::install_github('th1vairam/CovariateAnalysis@dev')"\ 
 && R -e "devtools::install_github('brian-bot/githubr')"\ 
 && R -e "devtools::install_github('blogsdon/spike/spike')"\ 
 && R -e "install.packages('doParallel')"\

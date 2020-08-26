@@ -590,11 +590,12 @@ all.annotations = list(
   genomeAssemblyID = 'GRCh38'
 )
 # Store SVA results
-ENRICH_OBJ <-  syn_temp$store( synapseclient$File( path='~/igraph_Network_Expansion/', name = 'Normalised, covariates, surrogate and Diagnosis variable adjusted residual expression (for eQTL)', parentId=CODE$properties$id ), used = Syns_Used, activityName = activityName, executed = thisFile, activityDescription = activityDescription)
-  all.annotations$dataSubType = 'residualGeneExpForeQTL'
+ENRICH_OBJ <-  syn_temp$store( synapseclient$File( path='~/igraph_Network_Expansion/Enriched_Clustered_JS_Estimator.graphml', name = 'Clustered_JS_Estimator-Kinase List', parentId=CODE$properties$id ), used = Syns_Used, activityName = activityName, executed = thisFile, activityDescription = activityDescription)
   syn_temp$setAnnotations(ENRICH_OBJ, annotations = all.annotations)
  
-
+ENRICH_OBJ <-  syn_temp$store( synapseclient$File( path='~/igraph_Network_Expansion/Enriched_Clustered_NoEstimator.graphml', name = 'Clustered_No_Estimator-Kinase List', parentId=CODE$properties$id ), used = Syns_Used, activityName = activityName, executed = thisFile, activityDescription = activityDescription)
+  syn_temp$setAnnotations(ENRICH_OBJ, annotations = all.annotations)
+ 
 ```
 
 ```{r plotcode}

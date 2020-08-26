@@ -521,7 +521,7 @@ Enriched_Clustered_NoEstimator <- list( DataFrame     = Total_Cor,
       CorectedPVals = vect_cor,
       Significant_ModuleNet = Trial.path )
 save(Enriched_Clustered_NoEstimator, file = 'Enriched_Clustered_NoEstimator.RData')
-igraph::write_graph(Trial.path, "Enriched_Clustered_NoEstimator.graphml", format = "graphml")
+igraph::write_graph(Trial.path, "~/igraph_Network_Expansion/Enriched_Clustered_NoEstimator.graphml", format = "graphml")
  
 #####################################
 ###Expanded James-Stein Estimator set
@@ -551,13 +551,53 @@ Enriched_Clustered_JS_Estimator <- list( DataFrame = Total_Cor,
       Significant_ModuleNet = JS.Trial.path )
 save(Enriched_Clustered_JS_Estimator, file = 'Enriched_Clustered_JS_Estimator.RData')
 
-igraph::write_graph(JS.Trial.path, "Enriched_Clustered_JS_Estimator.graphml", format = "graphml")
+igraph::write_graph(JS.Trial.path, "~/igraph_Network_Expansion/Enriched_Clustered_JS_Estimator.graphml", format = "graphml")
+```
 
-##############################################################################
+```{r synapse.parameters, include=FALSE, cache=TRUE}
+parentId = 'syn20798011';
+activityName = 'Covariate and Diagnosis Regression';
+activityDescription = 'Covariate analysis and Regrsison of AD Diagnosis of aligned effective counts with GRCh37 with CQN normalisation (IFG, STG, FP, PHG)';
+thisFileName <- '2020_04_13_SandboxCode.Rmd'
+# Github link
+#devtools::install_github('brian-bot/githubr')
+thisRepo <- githubr::getRepo(repository = 'jgockley62/igraph_Network_Expansion', ref="branch", refName='master')
+thisFile <- githubr::getPermlink(repository = thisRepo, repositoryPath=paste0('code/',thisFileName))
+```
 
-##Kinases not in graph: "TSSK3", "SNX16", "NEK11", "MINK1", "PKMYT1", "TESK2", "MELK", "DYRK4", "GK2", "MAGI2", "MAST2", "TESK1", "AURKB", "MAPKAPK5"
-
+### Store files in synapse
+```{r synapse.store, include=FALSE, eval=TRUE, cache=FALSE}
+parentId <- 'syn21534582'
+activityName = 'Igraph_KinaseNets';
+activityDescription = 'Pilot of the igraph pathway tracing networks with Jesse\'s Kinase List';
+CODE <- syn_temp$store(synapseclient$Folder(name = "igraphData", parentId = parentId))
+#Set Used SynIDs For Provenance
+Syns_Used <- c(  'syn21914063', 'syn21914056', 'syn21914057', 'syn21914059', 'syn21914061',
+                 'syn21914064', 'syn21914065', 'syn21914070', 'syn21914071', 'syn21914072',
+                 'syn21914078', 'syn21914082', 'syn21914083', 'syn21914087', 'syn21914090',
+                 'syn21914091', 'syn21914093', 'syn21914094', 'syn21914074', 'syn21630206',
+                 'syn21592277', 'syn21655283', 'syn21965435', 'syn21785669', 'syn21911919', 
+                 'syn21898644' )
+# Set annotations
+all.annotations = list(
+  dataType = 'Network',
+  summaryLevel = 'gene',
+  assay	 = 'RNAseq',
+  tissueTypeAbrv	= c('IFG', 'STG', 'FP', 'PHG', 'TCX', 'DLFPC'), 
+  study = c( 'MSBB', 'ROSMAP', 'Mayo' ), 
+  organism = 'HomoSapiens',
+  consortium	= 'TreatAD',
+  genomeAssemblyID = 'GRCh38'
+)
+# Store SVA results
+ENRICH_OBJ <-  syn_temp$store( synapseclient$File( path='~/igraph_Network_Expansion/', name = 'Normalised, covariates, surrogate and Diagnosis variable adjusted residual expression (for eQTL)', parentId=CODE$properties$id ), used = Syns_Used, activityName = activityName, executed = thisFile, activityDescription = activityDescription)
+  all.annotations$dataSubType = 'residualGeneExpForeQTL'
+  syn_temp$setAnnotations(ENRICH_OBJ, annotations = all.annotations)
  
+
+```
+
+```{r plotcode}
 #################### 
 ## Get subgraph & plot
 Keep = names(V(JS_net_undirected))[ names(V(JS_net_undirected)) %in% JS_Clust_bt[[131]] ]#c( JS_Clust_bt[[N]], JS_Clust_bt[[131]]) ]

@@ -4,7 +4,7 @@
 :6080 {
     log
     root * /data
-    reverse_proxy igraph_network_expansion_cyto_1:6080
+    reverse_proxy igraph_network_expansion_app_1:6080
 
     handle_path /files/* {
         file_server browse

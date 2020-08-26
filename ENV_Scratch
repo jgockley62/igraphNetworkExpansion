@@ -1,0 +1,5 @@
+#Docker Environment file. Set the Hash, PASS, and USER Variables to login
+FOO=FOO
+HASH=JDJhJDEwJGg3U1lXUHdlRFdYQXZqS0dsT0xwWi5MQjZSUy8ualVyaFgyYXpqRjFtOFVNWi94NGxZMS5x
+USER=jgockley
+PASS=test

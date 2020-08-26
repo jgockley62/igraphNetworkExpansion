@@ -2,7 +2,7 @@ version: "3.3"
 
 services:
 
-  cyto:
+  app:
     image: biodepot/novnc-cynetworkbma:latest
     expose:
       - 6080
@@ -12,21 +12,21 @@ services:
       - /home/jgockley/igraph_Network_Expansion:/home/jgockley/igraph_Network_Expansion
     ports:
       - "6080:6080"
-    env_file:
-      - /home/jgockley/igraph_Network_Expansion/dock.env
+    depends_on:
+      - "caddy"
     environment:
-      - APP_USERNAME=jgockley
-      - APP_PASSWORD_HASH=test
+      - APP_USERNAME=$USER
+      - APP_PASSWORD_HASH=$HASH
 
   rstudio:
     image: jgockley/igraphnetworkexpansion:Network
     volumes:
-       - /home/jgockley/igraph_Network_Expansion:/home/jgockley/igraph_Network_Expansion
+      - /home/jgockley/igraph_Network_Expansion:/home/jgockley/igraph_Network_Expansion
     ports:
       - "8787:8787"
     environment:
-      - USER=jgockley
-      - PASSWORD=Test1!
+      - USER=$USER
+      - PASSWORD=$PASS
 
   caddy:
     image: cyto-caddy:latest
@@ -38,14 +38,12 @@ services:
       - /home/jgockley/igraph_Network_Expansion:/home/jgockley/igraph_Network_Expansion
     ports:
       - "6080:6080"
-    env_file:
-      - /home/jgockley/igraph_Network_Expansion/dock.env
     environment:
-      - APP_USERNAME='${USER}'
-      - APP_PASSWORD_HASH=test
-      - name=igraph_network_expansion_cyto_1
+      - APP_USERNAME=$USER
+      - APP_PASSWORD_HASH=$HASH
+      - name=igraph_network_expansion_app_1
       - net=trial
-      - reverse_proxy_from=cyto:6080
+      - reverse_proxy_from=app:6080
 
 networks:
   trial:

@@ -433,8 +433,8 @@ Total_Cor[ grepl( 'CACNA2D2:CACNG2', as.character(Total_Cor$UniqCol)) | grepl( '
 #Remove reciprocate duplicates:
 tmp <- t(apply( Total_Cor[,c('to','from')], 1, sort ) ) 
 Total_Cor$altUnique <- paste0( as.character(tmp[,1]), ':', as.character(tmp[,2]), '-', as.character(Total_Cor$interaction) )
-Total_Cor<- Total_Cor[ !duplicated(Total_Cor$altUnique), ]
-Total_Cor[ , colnames(Total_Cor) != 'altUnique' ]
+Total_Cor <- Total_Cor[ !duplicated(Total_Cor$altUnique), ]
+Total_Cor <- Total_Cor[ , colnames(Total_Cor) != 'altUnique' ]
 
 #Make iGraph net and cluster
 net_undirected <- graph_from_data_frame(d=Total_Cor, vertices=Genes, directed=F) 
@@ -447,6 +447,7 @@ Sys.time()-Start
 
 
 #James-Stein Estimator
+install.packages("corpcor")
 library(corpcor)
 foo <- as_adjacency_matrix(net_undirected, type = "upper", attr = "Avg_Cortex_CE", edges = FALSE, names = TRUE)#, sparse = igraph_opt("sparsematrices"))
 
@@ -459,11 +460,11 @@ foo.shrink <- cor.shrink(foo)
 # 61419829
 #length(as.vector(foo.shrink))
 #82755409
-
+library(tidyr)
 DT <- data.frame(col = rep(colnames(foo.shrink), each = nrow(foo.shrink)), 
              row = rep(rownames(foo.shrink), ncol(foo.shrink)), 
              value = as.vector(foo.shrink))
-DT %>% mutate_if(is.factor, as.character) -> DT
+DT %>% dplyr::mutate_if(is.factor, as.character) -> DT
 row.names(DT) <- paste0( DT[,1], ':', DT[,2] )
 
 Total_Cor$JS <- DT[ Total_Cor$Edge, ] 
@@ -492,67 +493,10 @@ big <- Big[ Big %in% names(V(JS_net_undirected)) ]
 
 #Expand the big geneset:
 temp <- DT[ (DT$col %in% big | DT$row %in% big) & DT$value > 0.001, ]
-poo<-c(temp$col,temp$row)
+poo <- c(temp$col,temp$row)
 poo <- poo[!duplicated(poo)]
 
-#####################################
-#Look for enrichment in JS cluster object
-Vect <- rep(NA, length(JS_Clust_bt))
-for( i in 1:length(JS_Clust_bt) ){
-  PVal <- pbinom(length( big[ big %in% JS_Clust_bt[[i]] ] ), 
-       size=length(JS_Clust_bt[[i]] ), 
-       prob=length(big)/length( V(JS_net_undirected)),
-       lower.tail = F
-  )
-  Vect[i] <- PVal
-}
-
-Vect_cor <- p.adjust(Vect, method='fdr', n=length(Vect) )
-
-message( paste0('Minimum P-Val of Geneset Enrichment in a module: ',  min(Vect) ))
-N <- which( Vect == min(Vect) )
-JS_Clust_bt[[N]]
-
-
-Vect <- rep(NA, length(JS_Clust_bt))
-for( i in 1:length(JS_Clust_bt) ){
-  PVal <- pbinom(length( poo[ poo %in% JS_Clust_bt[[i]] ] ), 
-       size=length(JS_Clust_bt[[i]] ), 
-       prob=length(poo)/length( V(JS_net_undirected)),
-       lower.tail = F
-  )
-  Vect[i] <- PVal
-}
-
-Vect_cor <- p.adjust(Vect, method='fdr', n=length(Vect) )
-
-message( paste0('Minimum P-Val of Geneset Enrichment in a module: ',  min(Vect) ))
-#N <- which( Vect == min(Vect[ Vect != min(Vect)]) )
-N <- which( Vect == min(Vect) )
-
-JS_Clust_bt[[N]]
-
-table( poo %in% JS_Clust_bt[[N]] )
-table( big %in% JS_Clust_bt[[N]] )
-
-##############################################################################
-#Non-JS
-vect <- rep(NA, length(Clust_bt))
-for( i in 1:length(Clust_bt) ){
-  PVal <- pbinom( length( big[ big %in% Clust_bt[[i]] ] ), 
-       size=length(Clust_bt[[i]] ), 
-       prob=length(big)/length( V(net_undirected)),
-       lower.tail = F
-  )
-  vect[i] <- PVal
-}
-
-message( paste0('Minimum P-Val of Geneset Enrichment in a module: ',  min(vect) ))
-n <- which(  vect == min(vect) )
-Clust_bt[[n]]
-
-vect_cor <- p.adjust(vect, method='fdr', n=length(vect) )
-
+#Non-James Stein
 vect <- rep(NA, length(Clust_bt))
 for( i in 1:length(Clust_bt) ){
   PVal <- pbinom( length( poo[ poo %in% Clust_bt[[i]] ] ), 
@@ -564,21 +508,62 @@ for( i in 1:length(Clust_bt) ){
 }
 vect_cor <- p.adjust(vect, method='fdr', n=length(vect) )
 
-#which( vect_cor < 0.05 )
-message( paste0('Minimum P-Val of Geneset Enrichment in a module: ',  min(vect) ))
-nn <- which(  vect == min(vect) )
-Clust_bt[[nn]]
+#Annotate the network with module membership
+V(net_undirected)$community <- Clust_bt$membership
 
-table( poo %in% Clust_bt[[nn]] )
-table( big %in% Clust_bt[[nn]] )
+#Reduce Network to Significantly enriched Clusters
+Keep = as.vector(unlist( Clust_bt[ which( vect_cor < 0.05 ) ] ))
+Trial.path <- induced_subgraph(net_undirected, Keep)
+
+Enriched_Clustered_NoEstimator <- list( DataFrame     = Total_Cor,
+      FullNet       = net_undirected,
+      Clusters      = Clust_bt,
+      CorectedPVals = vect_cor,
+      Significant_ModuleNet = Trial.path )
+save(Enriched_Clustered_NoEstimator, file = 'Enriched_Clustered_NoEstimator.RData')
+igraph::write_graph(Trial.path, "Enriched_Clustered_NoEstimator.graphml", format = "graphml")
+ 
+#####################################
+###Expanded James-Stein Estimator set
+Vect <- rep(NA, length(JS_Clust_bt))
+for( i in 1:length(JS_Clust_bt) ){
+  PVal <- pbinom(length( poo[ poo %in% JS_Clust_bt[[i]] ] ), 
+       size=length(JS_Clust_bt[[i]] ), 
+       prob=length(poo)/length( V(JS_net_undirected)),
+       lower.tail = F
+  )
+  Vect[i] <- PVal
+}
+
+JS_Vect_cor <- p.adjust(Vect, method='fdr', n=length(Vect) )
+
+#Annotate the network with module membership
+V(JS_net_undirected)$community <- JS_Clust_bt$membership
+
+#Reduce Network to Significantly enriched Clusters
+Keep = as.vector(unlist( JS_Clust_bt[ which( JS_Vect_cor < 0.05 ) ] ))
+JS.Trial.path <- induced_subgraph(JS_net_undirected, Keep)
+
+Enriched_Clustered_JS_Estimator <- list( DataFrame = Total_Cor,
+      FullNet       = JS_net_undirected,
+      Clusters      = JS_Clust_bt,
+      CorectedPVals = JS_Vect_cor,
+      Significant_ModuleNet = JS.Trial.path )
+save(Enriched_Clustered_JS_Estimator, file = 'Enriched_Clustered_JS_Estimator.RData')
+
+igraph::write_graph(JS.Trial.path, "Enriched_Clustered_JS_Estimator.graphml", format = "graphml")
+
+##############################################################################
+
 ##Kinases not in graph: "TSSK3", "SNX16", "NEK11", "MINK1", "PKMYT1", "TESK2", "MELK", "DYRK4", "GK2", "MAGI2", "MAST2", "TESK1", "AURKB", "MAPKAPK5"
 
-
+ 
 #################### 
 ## Get subgraph & plot
 Keep = names(V(JS_net_undirected))[ names(V(JS_net_undirected)) %in% JS_Clust_bt[[131]] ]#c( JS_Clust_bt[[N]], JS_Clust_bt[[131]]) ]
 Trial.path <- induced_subgraph(JS_net_undirected, Keep)
 
+#igraph::plot.igraph(JS_Clust_bt, as.undirected(Trial.path))
 igraph::plot.igraph(Trial.path, edge.arrow.size=.4)
 
 #Color the Edges Based on interaction type

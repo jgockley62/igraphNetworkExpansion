@@ -643,6 +643,13 @@ ENRICH_OBJ <-  syn_temp$store( synapseclient$File( path='~/igraph_Network_Expans
 Keep = names(V(JS_net_undirected))[ names(V(JS_net_undirected)) %in% JS_Clust_bt[[131]] ]#c( JS_Clust_bt[[N]], JS_Clust_bt[[131]]) ]
 Trial.path <- induced_subgraph(JS_net_undirected, Keep)
 
+#JS
+Plot.NetWork <- JS.Trial.path
+Basic_Net <- JS_net_undirected
+#Non JS
+Plot.NetWork <- Trial.path
+Basic_Net <- net_undirected
+
 #igraph::plot.igraph(JS_Clust_bt, as.undirected(Trial.path))
 igraph::plot.igraph(Trial.path, edge.arrow.size=.4)
 

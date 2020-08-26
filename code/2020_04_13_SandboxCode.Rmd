@@ -428,7 +428,7 @@ Total_Cor$to <- as.character(Total_Cor$to)
 head( apply( Total_Cor[,c('to','from')], 1, sort ) )
 Total_Cor$altUnique <- paste0( as.character(Total_Cor$to), ':', as.character(Total_Cor$from), '-', as.character(Total_Cor$interaction) )
 #Total_Cor <- Total_Cor[ (Total_Cor$altUnique %in% Total_Cor$UniqCol)==F ,]
-Total_Cor[ grepl( 'CACNA2D2:CACNG2', as.character(Total_Cor$UniqCol)) | grepl( 'CACNG2:CACNA2D2', as.character(Total_Cor$UniqCol)), ]
+#Total_Cor[ grepl( 'CACNA2D2:CACNG2', as.character(Total_Cor$UniqCol)) | grepl( 'CACNG2:CACNA2D2', as.character(Total_Cor$UniqCol)), ]
 
 #Remove reciprocate duplicates:
 tmp <- t(apply( Total_Cor[,c('to','from')], 1, sort ) ) 
@@ -467,13 +467,13 @@ DT <- data.frame(col = rep(colnames(foo.shrink), each = nrow(foo.shrink)),
 DT %>% dplyr::mutate_if(is.factor, as.character) -> DT
 row.names(DT) <- paste0( DT[,1], ':', DT[,2] )
 
-Total_Cor$JS <- DT[ Total_Cor$Edge, ] 
+Total_Cor$JS <- abs( DT[ Total_Cor$Edge, ]$value )
 
 #Make iGraph net and cluster
 JS_net_undirected <- graph_from_data_frame(d=Total_Cor, vertices=Genes, directed=F) 
 # Louvain Clustering
 Start <- Sys.time()
-JS_Clust_bt <- cluster_louvain(JS_net_undirected, weights = E(net_undirected)$JS)
+JS_Clust_bt <- cluster_louvain(JS_net_undirected, weights = E(JS_net_undirected)$JS)
 Sys.time()-Start
 
 compare( JS_Clust_bt, Clust_bt, method="vi")
@@ -507,9 +507,26 @@ for( i in 1:length(Clust_bt) ){
   vect[i] <- PVal
 }
 vect_cor <- p.adjust(vect, method='fdr', n=length(vect) )
-
+message(paste0("Non-James-Stein Estimator:"))
+message(paste0("Significant Modules: ", paste(which( vect_cor < 0.05 ), collapse = ', ')))
+message(paste0("Significant Module Cor P-values: ", paste(vect_cor[vect_cor<0.05], collapse = ', ')))
 #Annotate the network with module membership
 V(net_undirected)$community <- Clust_bt$membership
+
+size<-NULL
+Exp_Genes <- NULL
+OL_B <- NULL
+OL_S <- NULL
+for( i in 1:length(which( vect_cor < 0.05 )) ) {
+  size <- c(size, length( Clust_bt[[ which( vect_cor < 0.05 )[i] ]] ))
+  OL_B <- c(OL_B, length( Big[ Big %in% Clust_bt[[ which( vect_cor < 0.05 )[i] ]] ]) )
+  if( length( Small[ Small %in% Clust_bt[[ which( vect_cor < 0.05 )[i] ]] ]) > 0 ){
+    OL_S <- c(OL_S, length( Small[ Small %in% Clust_bt[[ which( vect_cor < 0.05 )[i] ]] ]))
+  }else{
+    OL_S <- c(OL_S,0)
+  }
+  Exp_Genes <- c(Exp_Genes, length( poo[ poo %in% Clust_bt[[ which( vect_cor < 0.05 )[i] ]] ]) )
+}
 
 #Reduce Network to Significantly enriched Clusters
 Keep = as.vector(unlist( Clust_bt[ which( vect_cor < 0.05 ) ] ))
@@ -536,12 +553,34 @@ for( i in 1:length(JS_Clust_bt) ){
 }
 
 JS_Vect_cor <- p.adjust(Vect, method='fdr', n=length(Vect) )
+message(paste0("James-Stein Estimator:"))
+message(paste0("Significant Modules: ", paste(which( JS_Vect_cor < 0.05 ), collapse = ', ')))
+message(paste0("Significant Module Cor P-values: ", paste(JS_Vect_cor[JS_Vect_cor<0.05], collapse = ', ')))
 
 #Annotate the network with module membership
 V(JS_net_undirected)$community <- JS_Clust_bt$membership
 
+JS_size<-NULL
+JS_Exp_Genes <- NULL
+JS_OL_B <- NULL
+JS_OL_S <- NULL
+Mod_Keep <- NULL
+for( i in 1:length(which( JS_Vect_cor < 0.05 )) ) {
+  JS_size <- c(JS_size, length( JS_Clust_bt[[ which( JS_Vect_cor < 0.05 )[i] ]] ))
+  if( length( JS_Clust_bt[[ which( JS_Vect_cor < 0.05 )[i] ]]) > 10  ){
+    Mod_Keep <- c(Mod_Keep,  which( JS_Vect_cor < 0.05 )[i] )
+    JS_OL_B <- c(JS_OL_B, length( Big[ Big %in% JS_Clust_bt[[ which( JS_Vect_cor < 0.05 )[i] ]] ]) )
+    if( length( Small[ Small %in% JS_Clust_bt[[ which( JS_Vect_cor < 0.05 )[i] ]] ]) > 0 ){
+      JS_OL_S <- c(JS_OL_S, length( Small[ Small %in% JS_Clust_bt[[ which( JS_Vect_cor < 0.05 )[i] ]] ]))
+    }else{
+      JS_OL_S <- c(JS_OL_S,0)
+    }
+    JS_Exp_Genes <- c(JS_Exp_Genes, length( poo[ poo %in% JS_Clust_bt[[ which( JS_Vect_cor < 0.05 )[i] ]] ]) )
+  }
+}
+
 #Reduce Network to Significantly enriched Clusters
-Keep = as.vector(unlist( JS_Clust_bt[ which( JS_Vect_cor < 0.05 ) ] ))
+Keep = as.vector(unlist( JS_Clust_bt[ Mod_Keep ] ))
 JS.Trial.path <- induced_subgraph(JS_net_undirected, Keep)
 
 Enriched_Clustered_JS_Estimator <- list( DataFrame = Total_Cor,
@@ -814,17 +853,12 @@ length(Clust_bt)
 
 ModSiz <- NULL
 for( i in 1:length(JS_Clust_bt) ){
-  ModSiz <- c(ModSiz, length(Clust_bt[[i]]))
+  ModSiz <- c(ModSiz, length(JS_Clust_bt[[i]]))
   #message( paste0( "Cluster ", i, " contains ", length(Clust_bt[[i]]), " Genes"))
 }
-> modularity(Clust_bt)
-#[1] 0.1978309
-
+modularity(Clust_bt)
 length(ModSiz)
-#[1] 5070
-
 length( ModSiz[ ModSiz>10] )
-#[1] 10
 
 
 ########

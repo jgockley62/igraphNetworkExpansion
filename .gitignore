@@ -1,3 +1,4 @@
+*.graphml
 ReferenceData/*
 code/*.csv
 *.tsv

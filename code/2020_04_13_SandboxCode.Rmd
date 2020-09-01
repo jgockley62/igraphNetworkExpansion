@@ -16,7 +16,7 @@ library(clusterProfiler)
 library(parallel)
 library(doParallel)
 library(RColorBrewer)
-devtools::install_github("jhrcook/HotNetvieweR")
+#devtools::install_github("jhrcook/HotNetvieweR")
 library(HotNetvieweR)
 source('igraphhack/igraphplot2.R')
 ```

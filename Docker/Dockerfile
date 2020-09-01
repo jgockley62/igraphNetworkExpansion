@@ -90,4 +90,6 @@ RUN  sudo apt-get -y install liblzma-dev \
 && R -e "install.packages('RJSONIO')"\
 && R -e "BiocManager::install('RCy3')"\
 && sudo apt-get install -y glpk-utils libglpk-dev glpk-doc \
-&& R -e "install.packages('Rglpk')"
+&& R -e "install.packages('Rglpk')" \
+&& R -e "install.packages('corpcor')" \
+&& R -e  "devtools::install_github('jhrcook/HotNetvieweR')"

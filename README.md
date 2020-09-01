@@ -39,9 +39,21 @@ docker pull biodepot/novnc-cynetworkbma
 docker build -t cyto-caddy caddy/.
 ```
 ### Build the envronment object containing login credentials
+This example will create the user name of both IP's as jgockley and the password as test
+
 ```{bash}
-#Hash the password
-docker run --rm -it cyto-caddy caddy hash-password -plaintext 'test'
+#Copy the scratch environment file into the used .env file
+sudo cp ENV_Scratch .env
+ 
+#Insert the hashed the password for the caddy image
+sudo sed -i  "s/hash/$(docker run --rm -it cyto-caddy caddy hash-password -plaintext 'test')/" .env
+
+#Insert the User name
+sudo sed -i  "s/user/jgockley/" .env
+
+#Insert the RStudio Password 
+sudo sed -i  "s/pass/test/" .env
+
 ```
 
 ### Build Containers

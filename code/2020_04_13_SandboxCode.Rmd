@@ -225,7 +225,7 @@ foo <- subgraph.edges( net_oldStyle, E(net_oldStyle)[ grepl( 'CHEBI', edge_attr(
 
 #############################################################################################################################
 ######Cluster the Total Graph
-devtools::install_github("igraph/rigraph")
+#devtools::install_github("igraph/rigraph")
 
 #Potential Weights For Clustering....
 Total$EdgeRep <- 0
@@ -447,7 +447,7 @@ Sys.time()-Start
 
 
 #James-Stein Estimator
-install.packages("corpcor")
+#install.packages("corpcor")
 library(corpcor)
 foo <- as_adjacency_matrix(net_undirected, type = "upper", attr = "Avg_Cortex_CE", edges = FALSE, names = TRUE)#, sparse = igraph_opt("sparsematrices"))
 
@@ -600,7 +600,13 @@ activityDescription = 'Covariate analysis and Regrsison of AD Diagnosis of align
 thisFileName <- '2020_04_13_SandboxCode.Rmd'
 # Github link
 #devtools::install_github('brian-bot/githubr')
-thisRepo <- githubr::getRepo(repository = 'jgockley62/igraph_Network_Expansion', ref="branch", refName='master')
+thisRepo <- githubr::getRepo(repository = 'jgockley62/igraph_Network_Expansion', ref="branch", refName='test')
+
+testRepo <- githubr::getRepo(repository = 'brian-bot/githubr', ref="branch", refName='master')
+
+repoCommit <- githubr::getRepo('jgockley62/igraph_Network_Expansion', ref='commit', refName='43b5d4d582e3343d0858d25ed041d83142d30812')
+repoHead <- githubr::getRepo('jgockley62/igraph_Network_Expansion')
+
 thisFile <- githubr::getPermlink(repository = thisRepo, repositoryPath=paste0('code/',thisFileName))
 ```
 

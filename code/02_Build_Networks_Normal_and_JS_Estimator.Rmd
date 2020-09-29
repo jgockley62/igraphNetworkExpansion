@@ -1,0 +1,165 @@
+---
+title: "02_Build_Networks_Normal_and_JS_Estimator"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+setwd('~/igraph_Network_Expansion/')
+library(igraph)
+library(paxtoolsr)
+library(RJSONIO)
+library(httr)
+library(DOSE)
+library(org.Hs.eg.db)
+library(clusterProfiler)
+library(parallel)
+library(doParallel)
+library(RColorBrewer)
+#devtools::install_github("jhrcook/HotNetvieweR")
+#install.packages('corpcor')
+#devtools::install_github("jhrcook/HotNetvieweR")
+library(HotNetvieweR)
+source('igraphhack/igraphplot2.R')
+```
+
+## R Import Data
+
+```{r Import}
+setwd('~/igraph_Network_Expansion/')
+
+User <- '< USER_ID >'
+Pass <- '< Password >'
+
+reticulate::use_python("/usr/bin/python", required = TRUE)
+synapseclient <- reticulate::import("synapseclient")
+syn_temp <- synapseclient$Synapse()
+syn_temp$login( User, Pass, '--rememberMe' )
+
+rm(User)
+rm(Pass)
+
+load( 'Total_Net_wCoexpression.RData' )
+
+```
+
+
+```{r MakeNet }
+#Try Cortex CE net:
+#Implement the edge_betweeness Algo:
+Total_Cor <- Total[ Total$Avg_Cortex_CE > 0,]
+#Total_Cor <- Total[ !is.na(Total$Avg_Cortex_CE) ,]
+Genes <- c( as.character(Total_Cor$from), as.character(Total_Cor$to) )
+Genes <- Genes[ !duplicated(Genes) ]
+
+# Cluster EDGE BETWEENESS CLUSTERING
+##Directed Graph:
+
+######TEST
+#CACNA2D2:CACNG2
+Total_Cor <- Total[ !is.na(Total$Avg_Cortex_CE),]
+Total_Cor <- Total_Cor[ Total_Cor$Avg_Cortex_CE > 0,]
+#Total_Cor <- Total_Cor[1:1000,]
+Total_Cor$from <- as.factor(as.character(Total_Cor$from))
+Total_Cor$to <- as.factor(as.character(Total_Cor$to))
+Genes <- c( as.character(Total_Cor$from), as.character(Total_Cor$to) )
+Genes <- Genes[ !duplicated(Genes) ]
+
+Total_Cor$from <- as.character(Total_Cor$from)
+Total_Cor$to <- as.character(Total_Cor$to)
+head( apply( Total_Cor[,c('to','from')], 1, sort ) )
+Total_Cor$altUnique <- paste0( as.character(Total_Cor$to), ':', as.character(Total_Cor$from), '-', as.character(Total_Cor$interaction) )
+#Total_Cor <- Total_Cor[ (Total_Cor$altUnique %in% Total_Cor$UniqCol)==F ,]
+#Total_Cor[ grepl( 'CACNA2D2:CACNG2', as.character(Total_Cor$UniqCol)) | grepl( 'CACNG2:CACNA2D2', as.character(Total_Cor$UniqCol)), ]
+
+#Remove reciprocate duplicates:
+tmp <- t(apply( Total_Cor[,c('to','from')], 1, sort ) ) 
+Total_Cor$altUnique <- paste0( as.character(tmp[,1]), ':', as.character(tmp[,2]), '-', as.character(Total_Cor$interaction) )
+Total_Cor <- Total_Cor[ !duplicated(Total_Cor$altUnique), ]
+Total_Cor <- Total_Cor[ , colnames(Total_Cor) != 'altUnique' ]
+
+#Make iGraph net and cluster
+net_undirected <- graph_from_data_frame(d=Total_Cor, vertices=Genes, directed=F) 
+# Louvain Clustering
+Start <- Sys.time()
+Clust_bt <- cluster_louvain(net_undirected, weights = E(net_undirected)$Avg_Cortex_CE)
+Sys.time()-Start
+
+#plot(net_undirected, mark.groups = Clust_bt)
+
+
+#James-Stein Estimator
+#install.packages("corpcor")
+library(corpcor)
+foo <- as_adjacency_matrix(net_undirected, type = "upper", attr = "Avg_Cortex_CE", edges = FALSE, names = TRUE)#, sparse = igraph_opt("sparsematrices"))
+
+foo.shrink <- cor.shrink(foo)
+#length(as.vector(foo)[as.vector(foo) >0])
+# 22634
+#length(as.vector(foo.shrink)[as.vector(foo.shrink) >0])
+# 272149
+#length(as.vector(foo.shrink)[as.vector(foo.shrink) != 0])
+# 61419829
+#length(as.vector(foo.shrink))
+#82755409
+library(tidyr)
+DT <- data.frame(col = rep(colnames(foo.shrink), each = nrow(foo.shrink)), 
+             row = rep(rownames(foo.shrink), ncol(foo.shrink)), 
+             value = as.vector(foo.shrink))
+DT %>% dplyr::mutate_if(is.factor, as.character) -> DT
+row.names(DT) <- paste0( DT[,1], ':', DT[,2] )
+
+Total_Cor$JS <- abs( DT[ Total_Cor$Edge, ]$value )
+
+#Make iGraph net and cluster
+JS_net_undirected <- graph_from_data_frame(d=Total_Cor, vertices=Genes, directed=F) 
+# Louvain Clustering
+Start <- Sys.time()
+JS_Clust_bt <- cluster_louvain(JS_net_undirected, weights = E(JS_net_undirected)$JS)
+Sys.time()-Start
+
+compare( JS_Clust_bt, Clust_bt, method="vi")
+compare( JS_Clust_bt, Clust_bt, method="nmi")
+compare( JS_Clust_bt, Clust_bt, method="split.join")
+compare( JS_Clust_bt, Clust_bt, method="rand")
+compare( JS_Clust_bt, Clust_bt, method="adjusted.rand")
+
+#Annotate Cluster membership within the networ
+V(JS_net_undirected)$community <- JS_Clust_bt$membership
+V(net_undirected)$community <- Clust_bt$membership
+
+#Save Networks and push to synapse
+save(net_undirected, file = 'FullNetwork_NoEstimator.RData')
+save(JS_net_undirected, file = 'FullNetwork_JS_Estimator.RData')
+
+parentId <- 'syn21534582'
+activityName = 'Igraph_Full_Networks';
+activityDescription = 'Full Protein-Protein Nets';
+CODE <- syn_temp$store(synapseclient$Folder(name = "igraphData", parentId = parentId))
+
+thisFileName <- '02_Build_Networks_Normal_and_JS_Estimator.Rmd'
+# Github link
+# Github link
+thisRepo <- githubr::getRepo(repository = "jgockley62/igraph_Network_Expansion", ref="branch", refName='master')
+thisFile <- githubr::getPermlink(repository = thisRepo, repositoryPath=paste0('code/',thisFileName))
+
+#Set Used SynIDs For Provenance
+Syns_Used <- c(  'syn21914063', 'syn21914056', 'syn21914057', 'syn21914059', 'syn21914061', 'syn21914064', 'syn21914065', 'syn21914070', 'syn21914071', 'syn21914072', 'syn21914078', 'syn21914082', 'syn21914083', 'syn21914087', 'syn21914090', 'syn21914091', 'syn21914093', 'syn21914094', 'syn21914074', 'syn21630206', 'syn21592277', 'syn21655283', 'syn21965435', 'syn21785669', 'syn21911919', 'syn21898644' )
+# Set annotations
+all.annotations = list(
+  dataType = 'Network',
+  summaryLevel = 'gene',
+  assay	 = 'RNAseq',
+  tissueTypeAbrv	= c('IFG', 'STG', 'FP', 'PHG', 'TCX', 'DLFPC'), 
+  study = c( 'MSBB', 'ROSMAP', 'Mayo' ), 
+  organism = 'HomoSapiens',
+  consortium	= 'TreatAD',
+  genomeAssemblyID = 'GRCh38'
+)
+
+# Store  
+ENRICH_OBJ <-  syn_temp$store( synapseclient$File( path='~/igraph_Network_Expansion/', name = 'FullNetwork_NoEstimator.RData', parentId=CODE$properties$id ), used = Syns_Used, executed = thisFile, activityName = activityName, activityDescription = activityDescription)
+
+ENRICH_OBJ <-  syn_temp$store( synapseclient$File( path='~/igraph_Network_Expansion/', name = 'FullNetwork_JS_Estimator.RData', parentId=CODE$properties$id ), used = Syns_Used, executed = thisFile, activityName = activityName, activityDescription = activityDescription)
+
+```

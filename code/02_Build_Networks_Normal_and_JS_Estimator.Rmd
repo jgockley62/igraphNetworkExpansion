@@ -28,26 +28,32 @@ source('igraphhack/igraphplot2.R')
 ```{r Import}
 setwd('~/igraph_Network_Expansion/')
 
-User <- '< USER_ID >'
-Pass <- '< Password >'
-
 reticulate::use_python("/usr/bin/python", required = TRUE)
 synapseclient <- reticulate::import("synapseclient")
 syn_temp <- synapseclient$Synapse()
-syn_temp$login( User, Pass, '--rememberMe' )
+syn_temp$login( )
 
-rm(User)
-rm(Pass)
+# 'Total_Net_wCoexpression.RData'
+load( syn_temp$get('syn22992205')$path )
 
-load( 'Total_Net_wCoexpression.RData' )
-
+# Use Correlation to choose to keep the edge or not
+Use_Cor <- 'NO'
 ```
 
 
 ```{r MakeNet }
+Total <- Total[ is.na(Total$Avg_Cortex_CE)==F, ]
 #Try Cortex CE net:
 #Implement the edge_betweeness Algo:
-Total_Cor <- Total[ Total$Avg_Cortex_CE > 0,]
+if( Use_Cor == 'YES' ){
+  #Only take edges with Coexpression
+  Total_Cor <- Total[ Total$Avg_Cortex_CE > 0,]
+}else{
+  #Else Only take edges with OMICs Weights
+  #Deprecated# Total_Cor <- Total[ is.na( Total$Avg_Cortex_CE ) == FALSE, ]
+  OMICS <- read.csv(syn_temp$get('syn22758171')$path)
+  Total_Cor <- Total[ Total$from %in% OMICS$GName & Total$to %in% OMICS$GName, ]
+}
 #Total_Cor <- Total[ !is.na(Total$Avg_Cortex_CE) ,]
 Genes <- c( as.character(Total_Cor$from), as.character(Total_Cor$to) )
 Genes <- Genes[ !duplicated(Genes) ]
@@ -57,8 +63,8 @@ Genes <- Genes[ !duplicated(Genes) ]
 
 ######TEST
 #CACNA2D2:CACNG2
-Total_Cor <- Total[ !is.na(Total$Avg_Cortex_CE),]
-Total_Cor <- Total_Cor[ Total_Cor$Avg_Cortex_CE > 0,]
+#Total_Cor <- Total[ !is.na(Total$Avg_Cortex_CE),]
+#Total_Cor <- Total_Cor[ Total_Cor$Avg_Cortex_CE > 0,]
 #Total_Cor <- Total_Cor[1:1000,]
 Total_Cor$from <- as.factor(as.character(Total_Cor$from))
 Total_Cor$to <- as.factor(as.character(Total_Cor$to))
@@ -67,7 +73,7 @@ Genes <- Genes[ !duplicated(Genes) ]
 
 Total_Cor$from <- as.character(Total_Cor$from)
 Total_Cor$to <- as.character(Total_Cor$to)
-head( apply( Total_Cor[,c('to','from')], 1, sort ) )
+#head( apply( Total_Cor[,c('to','from')], 1, sort ) )
 Total_Cor$altUnique <- paste0( as.character(Total_Cor$to), ':', as.character(Total_Cor$from), '-', as.character(Total_Cor$interaction) )
 #Total_Cor <- Total_Cor[ (Total_Cor$altUnique %in% Total_Cor$UniqCol)==F ,]
 #Total_Cor[ grepl( 'CACNA2D2:CACNG2', as.character(Total_Cor$UniqCol)) | grepl( 'CACNG2:CACNA2D2', as.character(Total_Cor$UniqCol)), ]
@@ -78,8 +84,16 @@ Total_Cor$altUnique <- paste0( as.character(tmp[,1]), ':', as.character(tmp[,2])
 Total_Cor <- Total_Cor[ !duplicated(Total_Cor$altUnique), ]
 Total_Cor <- Total_Cor[ , colnames(Total_Cor) != 'altUnique' ]
 
+#Need to set NA's to zeros for clustering purposes
+Total_Cor[ is.na(Total_Cor$Avg_Cortex_CE), ]$Avg_Cortex_CE <-0
+
+### Total_Cor[ ( Total_Cor$from %in% 'AXL' | Total_Cor$to %in% 'AXL') & (Total_Cor$from %in% 'SRC' | Total_Cor$to %in% 'SRC'), ] 
+### Total_Cor[ ( Total_Cor$from %in% 'AXL' | Total_Cor$to %in% 'AXL') & (Total_Cor$from %in% 'FYN' | Total_Cor$to %in% 'FYN'), ] 
+
 #Make iGraph net and cluster
-net_undirected <- graph_from_data_frame(d=Total_Cor, vertices=Genes, directed=F) 
+net_undirected <- graph_from_data_frame(d=Total_Cor, vertices=Genes, directed=F)
+net_directed <- graph_from_data_frame(d=Total_Cor, vertices=Genes, directed=T) 
+
 # Louvain Clustering
 Start <- Sys.time()
 Clust_bt <- cluster_louvain(net_undirected, weights = E(net_undirected)$Avg_Cortex_CE)
@@ -92,8 +106,10 @@ Sys.time()-Start
 #install.packages("corpcor")
 library(corpcor)
 foo <- as_adjacency_matrix(net_undirected, type = "upper", attr = "Avg_Cortex_CE", edges = FALSE, names = TRUE)#, sparse = igraph_opt("sparsematrices"))
+#foo[ is.na(foo) ] <- 0
 
-foo.shrink <- cor.shrink(foo)
+foo.shrink <- cor.shrink( as.matrix(foo) )
+
 #length(as.vector(foo)[as.vector(foo) >0])
 # 22634
 #length(as.vector(foo.shrink)[as.vector(foo.shrink) >0])
@@ -113,6 +129,8 @@ Total_Cor$JS <- abs( DT[ Total_Cor$Edge, ]$value )
 
 #Make iGraph net and cluster
 JS_net_undirected <- graph_from_data_frame(d=Total_Cor, vertices=Genes, directed=F) 
+JS_net_directed <- graph_from_data_frame(d=Total_Cor, vertices=Genes, directed=T) 
+
 # Louvain Clustering
 Start <- Sys.time()
 JS_Clust_bt <- cluster_louvain(JS_net_undirected, weights = E(JS_net_undirected)$JS)
@@ -128,9 +146,24 @@ compare( JS_Clust_bt, Clust_bt, method="adjusted.rand")
 V(JS_net_undirected)$community <- JS_Clust_bt$membership
 V(net_undirected)$community <- Clust_bt$membership
 
-#Save Networks and push to synapse
-save(net_undirected, file = 'FullNetwork_NoEstimator.RData')
-save(JS_net_undirected, file = 'FullNetwork_JS_Estimator.RData')
+V(JS_net_directed)$community <- JS_Clust_bt$membership
+V(net_directed)$community <- Clust_bt$membership
+
+if( Use_Cor == 'YES' ){
+  #Only take edges with Coexpression
+  #Save Networks and push to synapse
+  save(net_undirected, file = '~/igraph_Network_Expansion/code/FullNetwork_NoEstimator.RData')
+  save(JS_net_undirected, file = '~/igraph_Network_Expansion/code/FullNetwork_JS_Estimator.RData')
+  save(net_undirected, file = '~/igraph_Network_Expansion/code/DirectedFullNetwork_NoEstimator.RData')
+  save(JS_net_undirected, file = '~/igraph_Network_Expansion/code/DirectedFullNetwork_JS_Estimator.RData')
+
+}else{
+  #Else Only take edges with 2 coretex expressed genes
+  save(net_undirected, file = '~/igraph_Network_Expansion/code/FullNetwork_NoEstimator_Not_CoE_Filt.RData')
+  save(JS_net_undirected, file = '~/igraph_Network_Expansion/code/FullNetwork_JS_Estimator_Not_CoE_Filt.RData')
+  save(net_directed, file = '~/igraph_Network_Expansion/code/DirectedFullNetwork_NoEstimator_Not_CoE_Filt.RData')
+  save(JS_net_directed, file = '~/igraph_Network_Expansion/code/DirectedFullNetwork_JS_Estimator_Not_CoE_Filt.RData')
+}
 
 parentId <- 'syn21534582'
 activityName = 'Igraph_Full_Networks';
@@ -138,10 +171,10 @@ activityDescription = 'Full Protein-Protein Nets';
 CODE <- syn_temp$store(synapseclient$Folder(name = "igraphData", parentId = parentId))
 
 thisFileName <- '02_Build_Networks_Normal_and_JS_Estimator.Rmd'
+
 # Github link
-# Github link
-thisRepo <- githubr::getRepo(repository = "jgockley62/igraph_Network_Expansion", ref="branch", refName='master')
-thisFile <- githubr::getPermlink(repository = thisRepo, repositoryPath=paste0('code/',thisFileName))
+#TBD_ # thisRepo <- githubr::getRepo(repository = "jgockley62/igraph_Network_Expansion", ref="branch", refName='master')
+#TBD_ # thisFile <- githubr::getPermlink(repository = thisRepo, repositoryPath=paste0('code/',thisFileName))
 
 #Set Used SynIDs For Provenance
 Syns_Used <- c(  'syn21914063', 'syn21914056', 'syn21914057', 'syn21914059', 'syn21914061', 'syn21914064', 'syn21914065', 'syn21914070', 'syn21914071', 'syn21914072', 'syn21914078', 'syn21914082', 'syn21914083', 'syn21914087', 'syn21914090', 'syn21914091', 'syn21914093', 'syn21914094', 'syn21914074', 'syn21630206', 'syn21592277', 'syn21655283', 'syn21965435', 'syn21785669', 'syn21911919', 'syn21898644' )
@@ -157,9 +190,29 @@ all.annotations = list(
   genomeAssemblyID = 'GRCh38'
 )
 
-# Store  
-ENRICH_OBJ <-  syn_temp$store( synapseclient$File( path='~/igraph_Network_Expansion/', name = 'FullNetwork_NoEstimator.RData', parentId=CODE$properties$id ), used = Syns_Used, executed = thisFile, activityName = activityName, activityDescription = activityDescription)
 
-ENRICH_OBJ <-  syn_temp$store( synapseclient$File( path='~/igraph_Network_Expansion/', name = 'FullNetwork_JS_Estimator.RData', parentId=CODE$properties$id ), used = Syns_Used, executed = thisFile, activityName = activityName, activityDescription = activityDescription)
+if( Use_Cor == 'YES' ){
+  # Store  executed = thisFile,
+  ENRICH_OBJ <-  syn_temp$store( synapseclient$File( path='~/igraph_Network_Expansion/code/FullNetwork_NoEstimator.RData', name = 'FullNetwork_NoEstimator.RData', parentId=CODE$properties$id ), used = Syns_Used, activityName = activityName, activityDescription = activityDescription)
+
+  ENRICH_OBJ <-  syn_temp$store( synapseclient$File( path='~/igraph_Network_Expansion/code/FullNetwork_JS_Estimator.RData', name = 'FullNetwork_JS_Estimator.RData', parentId=CODE$properties$id ), used = Syns_Used, activityName = activityName, activityDescription = activityDescription)
+  
+  ENRICH_OBJ <-  syn_temp$store( synapseclient$File( path='~/igraph_Network_Expansion/code/DirectedFullNetwork_NoEstimator.RData', name = 'DirectedFullNetwork_NoEstimator.RDataFullNetwork_NoEstimator.RData', parentId=CODE$properties$id ), used = Syns_Used, activityName = activityName, activityDescription = activityDescription)
+
+  ENRICH_OBJ <-  syn_temp$store( synapseclient$File( path='~/igraph_Network_Expansion/code/DirectedFullNetwork_JS_Estimator.RData', name = 'DirectedFullNetwork_JS_Estimator.RData', parentId=CODE$properties$id ), used = Syns_Used, activityName = activityName, activityDescription = activityDescription)
+
+
+}else{
+  # Store  executed = thisFile,
+  ENRICH_OBJ <-  syn_temp$store( synapseclient$File( path='~/igraph_Network_Expansion/code/FullNetwork_NoEstimator_Not_CoE_Filt.RData', name = 'FullNetwork_NoEstimator_Not_CoE_Filt.RData', parentId=CODE$properties$id ), used = Syns_Used, activityName = activityName, activityDescription = activityDescription)
+
+  ENRICH_OBJ <-  syn_temp$store( synapseclient$File(   path='~/igraph_Network_Expansion/code/FullNetwork_JS_Estimator_Not_CoE_Filt.RData', name = 'FullNetwork_JS_Estimator_Not_CoE_Filt.RData', parentId=CODE$properties$id ), used = Syns_Used, activityName = activityName, activityDescription = activityDescription)
+  
+  # Store  executed = thisFile,
+  ENRICH_OBJ <-  syn_temp$store( synapseclient$File( path='~/igraph_Network_Expansion/code/DirectedFullNetwork_NoEstimator_Not_CoE_Filt.RData', name = 'DirectedFullNetwork_NoEstimator_Not_CoE_Filt.RData', parentId=CODE$properties$id ), used = Syns_Used, activityName = activityName, activityDescription = activityDescription)
+
+  ENRICH_OBJ <-  syn_temp$store( synapseclient$File(   path='~/igraph_Network_Expansion/code/DirectedFullNetwork_JS_Estimator_Not_CoE_Filt.RData', name = 'DirectedFullNetwork_JS_Estimator_Not_CoE_Filt.RData', parentId=CODE$properties$id ), used = Syns_Used, activityName = activityName, activityDescription = activityDescription)
+
+}
 
 ```

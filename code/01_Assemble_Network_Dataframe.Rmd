@@ -4,6 +4,8 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
+setwd('~/igraph_Network_Expansion/')
+
 knitr::opts_chunk$set(echo = TRUE)
 setwd('~/igraph_Network_Expansion/')
 library(igraph)
@@ -26,16 +28,10 @@ source('igraphhack/igraphplot2.R')
 ```{r Import}
 setwd('~/igraph_Network_Expansion/')
 
-User <- '< USER_ID >'
-Pass <- '< Password >'
-
 reticulate::use_python("/usr/bin/python", required = TRUE)
 synapseclient <- reticulate::import("synapseclient")
 syn_temp <- synapseclient$Synapse()
-syn_temp$login( User, Pass, '--rememberMe' )
-
-rm(User)
-rm(Pass)
+syn_temp$login(  )
 
 SIFs <- c('syn21914063',
   'syn21914056',
@@ -264,8 +260,8 @@ stopCluster(cl)
 sink_TO <-TOs
 
 #write to file
-write.csv( temp_Total, file='../ReferenceData/Occurance.csv')
-write.csv( TOs, file='../ReferenceData/SumTalliedOccur.csv')
+#write.csv( temp_Total, file='../ReferenceData/Occurance.csv')
+#write.csv( TOs, file='../ReferenceData/SumTalliedOccur.csv')
 #TOs <- dplyr::distinct(TOs)
 row.names(TOs) <- TOs[,1]
 TOs <- as.data.frame(TOs)
@@ -283,7 +279,8 @@ for(type in levels(Total$interaction) ){
     eval( parse( text=paste0('Graph$`', type, '` <- graph_from_data_frame(d=Total[ Total$interaction == \'', type, '\', ], vertices=Genes, directed=T) ') ) )
 }
 #Edge Sum is 1903389
-save(Total, file = "../ReferenceData/Final_Total.tsv")
+save(Total, file = "~/igraph_Network_Expansion/ReferenceData/Final_Total.RData")
+
 #load("../ReferenceData/Final_Total.tsv")
 #Another way to make the Network object But has multiple edges per-Vertex set
 net_oldStyle <- graph_from_data_frame(d=Total, vertices=Genes, directed=T) 
@@ -300,7 +297,7 @@ library("biomaRt")
 #dim(Total[ grepl('CHEBI', as.character(Total$UniqCol)) == F, ])
 Total <- Total[ grepl('CHEBI', as.character(Total$UniqCol)) == F, ]
 
-mart = useDataset("hsapiens_gene_ensembl", useEnsembl(biomart="ensembl", version=84))
+mart = useDataset( "hsapiens_gene_ensembl", useEnsembl(biomart="ensembl", version=84) )
 
 Genes <- c( as.character(Total$from), as.character(Total$to) )
 Genes <- Genes[ !duplicated(Genes) ]
@@ -399,5 +396,41 @@ Total$Avg_All_CE <- apply( Total[,c('DLPFC_CE', 'CBE_CE', 'FP_CE', 'IFG_CE', 'PH
 sink_Total <- Total
 save( Total, file='Total_Net_wCoexpression.RData' )
 #save.image('2020_08_13_CoexpAdd.RData')
+
+```
+
+```{r pushToSynapse }
+
+parentId <- 'syn21534582'
+activityName = 'Igraph_Full_Networks';
+activityDescription = 'Full Protein-Protein Nets';
+CODE <- syn_temp$store(synapseclient$Folder(name = "igraphData", parentId = parentId))
+
+thisFileName <- '01_Assemble_Network_Dataframe.Rmd'
+
+# Github link
+#TBD_ # thisRepo <- githubr::getRepo(repository = "jgockley62/igraph_Network_Expansion", ref="branch", refName='master')
+#TBD_ # thisFile <- githubr::getPermlink(repository = thisRepo, repositoryPath=paste0('code/',thisFileName))
+
+#Set Used SynIDs For Provenance
+Syns_Used <- SIFs
+
+
+# Set annotations
+all.annotations = list(
+  dataType = 'Network',
+  summaryLevel = 'gene',
+  assay	 = 'RNAseq',
+  tissueTypeAbrv	= c('IFG', 'STG', 'FP', 'PHG', 'TCX', 'DLFPC'), 
+  study = c( 'MSBB', 'ROSMAP', 'Mayo' ), 
+  organism = 'HomoSapiens',
+  consortium	= 'TreatAD',
+  genomeAssemblyID = 'GRCh38'
+)
+
+# Store  executed = thisFile,
+ENRICH_OBJ <-  syn_temp$store( synapseclient$File( path='~/igraph_Network_Expansion/ReferenceData/Final_Total.RData', name = 'Final Total Interaction dataset', parentId=CODE$properties$id ), used = Syns_Used, activityName = activityName, activityDescription = activityDescription)
+
+ENRICH_OBJ <-  syn_temp$store( synapseclient$File( path='~/igraph_Network_Expansion/Total_Net_wCoexpression.RData', name = 'Final Total Interaction dataset With Coexpression', parentId=CODE$properties$id ), used = Syns_Used, activityName = activityName, activityDescription = activityDescription)
 
 ```

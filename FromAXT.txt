@@ -1,0 +1,2 @@
+from	to	interaction	Occurance	UniqCol	pathway	EdgeRep	Edge	DLPFC_CE	CBE_CE	FP_CE	IFG_CE	PHG_CE	STG_CE	TCX_CE	Avg_Cortex_CE	Avg_All_CE
+AXL	FGFR1OP2	controls-state-change-of	2	AXL:FGFR1OP2-controls-state-change-of	

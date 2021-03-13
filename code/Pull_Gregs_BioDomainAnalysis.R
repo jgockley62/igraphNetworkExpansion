@@ -1,0 +1,371 @@
+#_# This script loads and filters Greg Cary's process enrichments
+#_# Input are two syn IDs for the GeneSet process and Gene assignments for the processes
+
+setwd('~/igraph_Network_Expansion/')
+##Insert User Credentials here. DO NOT Save DO NOT push to git or docker hub
+user <- '< USER_ID >'
+pass <- '< Password >'
+
+reticulate::use_python("/home/jgockley/.local/share/r-miniconda/envs/r-reticulate/bin/python", required = TRUE)
+synapseclient <- reticulate::import("synapseclient")
+syn_temp <- synapseclient$Synapse()
+syn_temp$login( User, Pass, '--rememberMe' )
+
+rm(user)
+rm(pass)
+
+#Annotation of Genes to Biological Domains 
+genes <- 'syn24827928' 
+processes <- 'syn24827958'
+
+genes <- readRDS(file = syn_temp$get(genes)$path)
+processes <- readRDS(file = syn_temp$get(processes)$path)
+
+sig_terms <- processes[processes$padj < 0.05, ]$pathway
+
+#' @param proc a list object of processes eg. genes
+#' @param term a go term eg. sig_terms[1] 
+biodomain_enumerator <- function (proc, term) {
+  return(
+    length(genes[ proc$GOterm_Name == term, ]$Biodomain)
+  )
+}
+#' @param proc a list object of processes eg. genes
+#' @param term a go term eg. sig_terms[1] 
+biodomain_translator <- function (proc, term) {
+  biods <- proc[ proc$GOterm_Name == term, ]$Biodomain
+  output <- cbind(
+    c(rep(term, length(biods))),
+    biods
+    )
+  return(output)
+}
+
+# Mapping of GoTerms to Biodomain
+table(sapply(sig_terms, biodomain_enumerator, proc=genes))
+
+# DF of GoTerm to Biodomains
+translator <- as.data.frame(
+  do.call(
+    rbind,
+    sapply(sig_terms, biodomain_translator, proc=genes)
+  )
+)
+
+leadingedge_genes <- list()
+all_genes <- list()
+
+biodomains <- names(table(translator$biods))
+
+######################################################################
+## All genes in GoTerms
+
+# Leading Edge finder
+#' @param proc a list object of processes eg. genes
+#' @param bd a biodomain term eg. biodomains[1]
+#' @param tran translation of go to biodomaing 
+all_numerator <- function (proc, tran, bd) {
+
+  pull_goterms <- tran[tran[,2]==bd,][,1]
+  proc[proc$GOterm_Name %in% pull_goterms,]$ensembl_id
+  ensgs <- do.call( c, proc[proc$GOterm_Name %in% pull_goterms,]$ensembl_id)
+  
+  return(ensgs)
+}
+
+# Plot leading edge reccurence
+par(mfrow=c(4,4))
+for(go in biodomains) {
+  message(go)
+  hist(
+    table(
+      all_numerator(
+        genes,
+        translator,
+        go)
+      ),
+    main = go,
+    xlab='Gene Recurences')
+}
+
+# Leading edge Unique Gene number
+uniq_all <- as.list(biodomains)
+names(uniq_all) <- biodomains
+for(go in biodomains) {
+  message(go)
+  enns <- all_numerator(
+    genes,
+    translator,
+    go
+  )
+  message(length(enns[!duplicated(enns)]))
+  uniq_all[[go]] <- enns[!duplicated(enns)]
+}
+
+############################################
+## Greg's leading edges
+
+
+# Leading Edge finder
+#' @param proc a list object of processes eg. processes
+#' @param bd a biodomain term eg. biodomains[1]
+#' @param tran translation of go to biodomaing 
+leadedge_numerator <- function (proc, tran, bd) {
+  
+  pull_goterms <- tran[tran[,2]==bd,][,1]
+  ensgs <- do.call(c, proc[proc$pathway %in% pull_goterms,]$leadingEdge)
+  
+  return(ensgs)
+}
+
+# Plot leading edge reoccurence
+par(mfrow=c(4,4))
+for(go in biodomains) {
+  message(go)
+  hist(
+    table(
+      leadedge_numerator(
+        processes,
+        translator,
+        go)
+    ),
+    main = go,
+    xlab='Gene Recurences')
+}
+
+# Leading edge Unique Gene number
+uniq_lead <- as.list(biodomains)
+names(uniq_lead) <- biodomains
+for(go in biodomains) {
+  message(go)
+  enns <- leadedge_numerator(
+    processes,
+    translator,
+    go
+  )
+  message(length(enns[!duplicated(enns)]))
+  uniq_lead[[go]] <- enns[!duplicated(enns)]
+}
+
+######################################################################
+## Pull Logsdon Scores
+
+## Function to pull gene scores from the overall score table
+#'@param genevec a vector of ENSGs to pull Logsdon scores ie. uniq_lead$Myelination
+#'
+
+# SELECT Overall FROM syn24168007 WHERE ENSG = 'ENSG00000149269'
+# SELECT ENSG,GeneName,OmicsScore,Overall FROM syn24168007 WHERE ENSG IN ('ENSG00000149269')
+pull_lead <- as.list(biodomains)
+names(pull_lead) <- biodomains
+
+pull_all <- as.list(biodomains)
+names(pull_all) <- biodomains
+
+for (bd in biodomains) { 
+  #Leading Edge Genes
+  df <- read.csv(
+    syn_temp$tableQuery(
+      query = paste0(
+        'SELECT ENSG,GeneName,OmicsScore,Overall FROM syn24168007 WHERE ENSG IN (\'',
+        paste0( uniq_lead[[bd]], collapse='\', \'' ),
+        '\')'),
+      resultsAs = 'csv')$filepath
+    )[, c('ENSG', 'GeneName', 'OmicsScore', 'Overall')]
+  df$logOmics <- log2(df$OmicsScore)
+  df$logOverall <- log2(df$Overall)
+  pull_lead[[bd]] <- df
+  
+  #All Genes
+  df <- read.csv(
+    syn_temp$tableQuery(
+      query = paste0(
+        'SELECT ENSG,GeneName,OmicsScore,Overall FROM syn24168007 WHERE ENSG IN (\'',
+        paste0( uniq_all[[bd]], collapse='\', \'' ),
+        '\')'),
+      resultsAs = 'csv')$filepath
+  )[, c('ENSG', 'GeneName', 'OmicsScore', 'Overall')]
+  df$logOmics <- log2(df$OmicsScore)
+  df$logOverall <- log2(df$Overall)
+  pull_all[[bd]] <- df
+  
+}
+######################################################################
+library(fitdistrplus)
+
+all_scores <- read.csv(
+  syn_temp$tableQuery(
+    query = paste0(
+      'SELECT ENSG,GeneName,OmicsScore,Overall FROM syn24168007'),
+    resultsAs = 'csv')$filepath
+)[, c('ENSG', 'GeneName', 'OmicsScore', 'Overall')]
+
+
+#### Functionaize...
+
+lapply( pull_lead,dim )
+lapply( pull_all,dim )
+
+data <- pull_lead[[bd]]
+look_dist <- pull_lead[[bd]]$Overall
+
+#' @param dat list object of dataframes eg pull_all or pull_lead
+#' @param val name of a data frame in list object dat eg. biodomains[1]
+#' @param Max max list size eg. 50
+#' @param Zstart the z value to start the pruning eg. 0.5 - 4 in increments
+#' @param SDstep the value to step increase until geneset is lesst than max
+list_generator <- function(dat, val, Max = 50, Zstart=1, Zstep = 0.5) {
+  
+  #Extract the dataframe
+  data <- dat[[val]]
+  # Extract the overall scores
+  look_dist <- data$Overall
+  
+  #Return if value is less than user threshold
+  if (length(look_dist) < 50){
+    return(data$GeneName)
+  }
+  # Test the 4 fit models
+  fitg <- summary( fitdistrplus::fitdist( look_dist, "gamma" ) )
+  fitln <- summary( fitdistrplus::fitdist( look_dist, "lnorm" ) )
+  fitW <- summary( fitdistrplus::fitdist( look_dist, "weibull" ) )
+  fitn <- fitdistrplus::fitdist(look_dist,"norm")
+  
+  SumStat <- gofstat(
+    list(fitW, fitg, fitln, fitn),
+    fitnames=c("Weibull", "gamma", "lognormal", "normal")
+  )
+  
+  # Examine if the 4 models converge
+  if (!(
+    names(SumStat$bic[SumStat$bic == min(SumStat$bic) ]) == 
+    names(SumStat$aic[ SumStat$aic == min(SumStat$aic) ])
+  )) {
+    message(paste0( val, ": MODEL DO NOT CONVERGE"))
+  }
+  
+  bic_stats <- as.data.frame(
+    cbind( 
+      BIC = SumStat$bic,
+      delBIC = SumStat$bic - min(SumStat$bic),
+      relLik. = exp(-0.5 * (SumStat$bic - min(SumStat$bic))),
+      bicweight =
+        exp(-0.5 * (SumStat$bic-min(SumStat$bic))) / 
+        sum(exp(-0.5 * (SumStat$bic-min(SumStat$bic))))
+    )
+  )
+  message(paste0(paste0(val, ":Overall Scores Best Predicted by ", 
+                  row.names(stats[bic_stats$bicweight == max(bic_stats$bicweight), ]),
+                  " model measured by BIC"))
+  )
+  aic_stats <- as.data.frame(
+    cbind( 
+      AIC = SumStat$aic,
+      delAIC = SumStat$aic-min(SumStat$aic),
+      relLik = exp(-0.5 * (SumStat$aic - min(SumStat$aic))),
+      aicweight = 
+        exp(-0.5 * (SumStat$aic - min(SumStat$aic))) / 
+        sum(exp(-0.5 * (SumStat$aic - min(SumStat$aic))))
+         )
+  )
+  
+  model_name <- row.names(
+    stats[bic_stats$bicweight == max(bic_stats$bicweight), ]
+  )
+  
+  message(paste0(val, ": Overall Scores Best Predicted by ", 
+                  row.names(stats[aic_stats$aicweight == max(aic_stats$aicweight), ]),
+                  " model measured by AIC")
+  )
+  
+  # Examine the liklehood that the model is best
+  if ( !(
+    aic_stats[ model_name , ]$aicweight > .80 &
+    bic_stats[ model_name , ]$bicweight > .80 
+  )) {
+    message(paste0( val, ": Consenus Model Less than 80% Likely!"))
+  }
+  
+  # Assign Probability if Best Model is Normal
+  if(model_name == 'normal') {
+    data$probability <- stats::pnorm( 
+      look_dist,
+      mean = mean(look_dist), 
+      sd = sd(look_dist),
+      lower.tail = FALSE, 
+      log.p = FALSE
+    )
+  }
+  # Assign Probability if Best Model is gamma
+  if(model_name == 'gamma') {
+    data$probability <- stats::pgamma( 
+      look_dist,
+      shape = fitg$sd['shape'], 
+      rate = fitg$sd['rate'],
+      lower.tail = FALSE, 
+      log.p = FALSE
+    )
+  }
+  # Assign Probability if Best Model is Weibull
+  if(model_name == 'Weibull') {
+    data$probability <- stats::pweibull( 
+      look_dist,
+      shape = fitW$estimate['shape'], 
+      scale = fitW$estimate['scale'],
+      lower.tail = FALSE, 
+      log.p = FALSE
+    )
+  }
+  # Assign Probability if Best Model is Log Normal
+  if(model_name == 'lognormal') {
+    data$probability <- stats::plnorm( 
+      look_dist,
+      meanlog = mean(log(look_dist)), 
+      sdlog = sd(log(look_dist)),
+      lower.tail = FALSE, 
+      log.p = FALSE
+    )
+  }
+  
+  # Order the geneset based on assigned probability
+  data <- data[ order(data$probability),  ]
+  
+  #Step the number of sds ontop of the Zstart till the remaining geneset is < 50
+  size <- dim(data)[1]
+  iteration <- 0
+  while (size > 50) {
+    cutoff <- 1 - pnorm(iteration * Zstep + Zstart)
+    output <- data[ data$probability < cutoff, ]
+    GeneList <- output$GeneName
+    
+    if(dim(output)[1] < 50){
+      message(paste0( val, " Gene Set for Tracing is ", length(GeneList), " genes"))
+    }
+    size <- dim(output)[1]
+    iteration <- iteration+1
+  }
+  return(GeneList)
+}
+
+  
+genelist_lead <- sapply(
+  biodomains, 
+  list_generator,
+  dat=pull_lead,
+  Max = 50,
+  Zstart=.5,
+  Zstep = 0.5
+)  
+
+genelist_all <- sapply(
+  biodomains, 
+  list_generator,
+  dat=pull_all,
+  Max = 50,
+  Zstart=.5,
+  Zstep = 0.5
+)  
+
+sapply( genelist_all, length )
+sapply( genelist_lead, length )
+

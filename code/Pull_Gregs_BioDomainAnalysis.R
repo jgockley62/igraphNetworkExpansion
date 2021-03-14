@@ -432,7 +432,7 @@ for (bd in biodomains) {
 }
 
 #Push to synapse: 
-parent_id <- 'syn25185164'
+parent_id <- 'syn25185168'
 activity_name = 'Gene Lists';
 activity_description = 'List of genes for pathway tracing';
 

@@ -483,7 +483,7 @@ for (fil_n in list.files('InputList/BiodomainLists/LeadingEdge/')) {
 
 ## Push All GoTerm
 CODE <- syn_temp$store(synapseclient$Folder(name = "All GoTerm Edge Lists",
-                                            parentId = parentID))
+                                            parentId = parent_id))
 
 for (fil_n in list.files('InputList/BiodomainLists/AllGoTerm/')) {
   enrich_obj <- syn_temp$store(

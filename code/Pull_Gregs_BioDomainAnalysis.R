@@ -414,7 +414,7 @@ for (path in rec_paths) {
 ##write to file:
 for (bd in biodomains) {
   data.table::fwrite(
-    as.list(genelist_lead[[bd]]),
+    as.list(genelist_all[[bd]]),
     file = paste0( 'InputList/BiodomainLists/AllGoTerm/',
                    gsub( ' ', '_',  bd),
                    '.txt'

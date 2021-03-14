@@ -2,6 +2,10 @@
 #_# Input are two syn IDs for the GeneSet process and Gene assignments for the processes
 
 setwd('~/igraph_Network_Expansion/')
+
+if ("fitdistrplus" %in% rownames(installed.packages()) == FALSE) {
+  install.packages("fitdistrplus")
+}
 ##Insert User Credentials here. DO NOT Save DO NOT push to git or docker hub
 user <- '< USER_ID >'
 pass <- '< Password >'
@@ -9,7 +13,7 @@ pass <- '< Password >'
 reticulate::use_python("/home/jgockley/.local/share/r-miniconda/envs/r-reticulate/bin/python", required = TRUE)
 synapseclient <- reticulate::import("synapseclient")
 syn_temp <- synapseclient$Synapse()
-syn_temp$login( User, Pass, '--rememberMe' )
+syn_temp$login( user, pass, '--rememberMe' )
 
 rm(user)
 rm(pass)
@@ -231,7 +235,7 @@ list_generator <- function(dat, val, Max = 50, Zstart=1, Zstep = 0.5) {
   fitW <- summary( fitdistrplus::fitdist( look_dist, "weibull" ) )
   fitn <- fitdistrplus::fitdist(look_dist,"norm")
   
-  SumStat <- gofstat(
+  SumStat <- fitdistrplus::gofstat(
     list(fitW, fitg, fitln, fitn),
     fitnames=c("Weibull", "gamma", "lognormal", "normal")
   )
@@ -255,7 +259,7 @@ list_generator <- function(dat, val, Max = 50, Zstart=1, Zstep = 0.5) {
     )
   )
   message(paste0(paste0(val, ":Overall Scores Best Predicted by ", 
-                  row.names(stats[bic_stats$bicweight == max(bic_stats$bicweight), ]),
+                  row.names(bic_stats[bic_stats$bicweight == max(bic_stats$bicweight), ]),
                   " model measured by BIC"))
   )
   aic_stats <- as.data.frame(
@@ -270,11 +274,11 @@ list_generator <- function(dat, val, Max = 50, Zstart=1, Zstep = 0.5) {
   )
   
   model_name <- row.names(
-    stats[bic_stats$bicweight == max(bic_stats$bicweight), ]
+    bic_stats[bic_stats$bicweight == max(bic_stats$bicweight), ]
   )
   
   message(paste0(val, ": Overall Scores Best Predicted by ", 
-                  row.names(stats[aic_stats$aicweight == max(aic_stats$aicweight), ]),
+                  row.names(aic_stats[aic_stats$aicweight == max(aic_stats$aicweight), ]),
                   " model measured by AIC")
   )
   
@@ -347,7 +351,6 @@ list_generator <- function(dat, val, Max = 50, Zstart=1, Zstep = 0.5) {
   return(GeneList)
 }
 
-  
 genelist_lead <- sapply(
   biodomains, 
   list_generator,
@@ -366,6 +369,133 @@ genelist_all <- sapply(
   Zstep = 0.5
 )  
 
-sapply( genelist_all, length )
-sapply( genelist_lead, length )
 
+for (i in 1:length(genelist_lead)) {
+  lead <- as.numeric(
+    table(
+      genelist_lead[[i]] %in% genelist_all[[i]]
+      )['TRUE']
+  )
+  all <- as.numeric(
+    table(
+      genelist_all[[i]] %in% genelist_lead[[i]]
+      )['TRUE']
+  )
+  if (all == lead) {
+    message(paste0(
+      "For ",
+      biodomains[i],
+      ": Total Overlap = ",
+      all,
+      " Percent All = ",
+      all / length(genelist_all[[i]]),
+      " Percent Lead = ",
+      lead / length(genelist_lead[[i]])
+      
+    ))
+  }else{
+    warning(paste0( "Issue matching genes for: ", biodomains[i] ))
+  }
+  
+}
+
+#Write Lists to File: 
+##test for destination paths:
+rec_paths <- c('InputList/BiodomainLists',
+               'InputList/BiodomainLists/LeadingEdge',
+               'InputList/BiodomainLists/AllGoTerm')
+for (path in rec_paths) {
+  if (dir.exists(path)){
+  }else{
+    dir.create(path)
+  }
+}
+
+##write to file:
+for (bd in biodomains) {
+  data.table::fwrite(
+    as.list(genelist_lead[[bd]]),
+    file = paste0( 'InputList/BiodomainLists/AllGoTerm/',
+                   gsub( ' ', '_',  bd),
+                   '.txt'
+                  ),
+    quote = FALSE,
+    sep = '\n')
+  data.table::fwrite(
+    as.list(genelist_lead[[bd]]),
+    file = paste0( 'InputList/BiodomainLists/LeadingEdge/',
+                   gsub( ' ', '_',  bd),
+                   '.txt'
+    ),
+    quote = FALSE,
+    sep = '\n')
+}
+
+#Push to synapse: 
+parent_id <- 'syn25185164'
+activity_name = 'Gene Lists';
+activity_description = 'List of genes for pathway tracing';
+
+this_filename <- 'Pull_Gregs_BioDomainAnalysis.R'
+this_repo <- githubr::getRepo(repository = "jgockley62/igraph_Network_Expansion", 
+                             ref="branch",
+                             refName='master'
+                            )
+this_file <- githubr::getPermlink(repository = this_repo,
+                                 repositoryPath=paste0('code/',
+                                                       this_filename
+                                                       )
+                                 )
+
+# Set annotations
+all_annotations = list(
+  dataType = 'Gene Lists',
+  dataSubType = 'HGNC Gene Names',
+  summaryLevel = 'gene',
+  assay	 = 'AD Gene Ranks',
+  tissueTypeAbrv	= NULL, 
+  study = 'TREAT-AD', 
+  organism = 'HomoSapiens',
+  consortium	= 'TREAT-AD'
+)
+
+syns_used <- c('syn24827928', 'syn24827958')
+
+### Store files in synapse
+## Push Leading Edge
+code <- syn_temp$store(synapseclient$Folder(name = "All Leading Edge Lists",
+                                            parentId = parent_id))
+
+for (fil_n in list.files('InputList/BiodomainLists/LeadingEdge/')) {
+  enrich_obj <- syn_temp$store(
+    synapseclient$File(
+      path=paste0('InputList/BiodomainLists/LeadingEdge/',fil_n),
+      name = gsub(
+        '_', ' ', gsub('.txt',  '', fil_n)
+      ), parentId=code$properties$id ),
+    used = syns_used,
+    activityName = activity_name,
+    executed = this_file,
+    activityDescription = activity_description
+  )
+  syn_temp$setAnnotations(enrich_obj, annotations = all_annotations)
+} 
+
+## Push All GoTerm
+CODE <- syn_temp$store(synapseclient$Folder(name = "All GoTerm Edge Lists",
+                                            parentId = parentID))
+
+for (fil_n in list.files('InputList/BiodomainLists/AllGoTerm/')) {
+  enrich_obj <- syn_temp$store(
+    synapseclient$File(
+      path=paste0('InputList/BiodomainLists/AllGoTerm/',fil_n),
+      name = gsub(
+        '_', ' ', gsub('.txt',  '', fil_n)
+      ), parentId=code$properties$id ),
+    used = syns_used,
+    activityName = activity_name,
+    executed = this_file,
+    activityDescription = activity_description
+  )
+  syn_temp$setAnnotations(enrich_obj, annotations = all_annotations)
+} 

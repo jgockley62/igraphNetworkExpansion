@@ -826,10 +826,10 @@ leading_edge <- list(
 ################################################################################
 
 ##### All Go Terms
+## - Run the whole list
+allgo_gene <- list()
+allgo_subnet <- list()
 for (i in 1:length(all_goterms)){
-  ## - Run the whole list
-  allgo_genes <- list()
-  allgo_subnest <- list()
   
   ### Load Lists:
   genes <- list_load( all_goterms[[i]][1], net, is_syn = TRUE )
@@ -842,10 +842,10 @@ for (i in 1:length(all_goterms)){
   g_list <- path_filter(trace)
   
   #store the genelists and subnets
-  allgo_genes[[all_goterms[[i]][2]]] <- g_list
-  allgo_subnets[[all_goterms[[i]][2]]] <- induced_subgraph(
-    network,
-    v=V(network)[names(V(network)) %in% g_list]
+  allgo_gene[[all_goterms[[i]][2]]] <- g_list
+  allgo_subnet[[all_goterms[[i]][2]]] <- induced_subgraph(
+    net,
+    v=V(net)[names(V(net)) %in% g_list]
   )
   
   ### Store the Trace
@@ -861,12 +861,10 @@ for (i in 1:length(all_goterms)){
 }
 
 
-
+leading_genes <- list()
+leading_subnest <- list()
 ##### Leading Edge
 for (i in 1:length(leading_edge)){
-  ## - Run the whole list
-  allgo_genes <- list()
-  allgo_subnest <- list()
   
   ### Load Lists:
   genes <- list_load( leading_edge[[i]][1], net, is_syn = TRUE )
@@ -879,10 +877,10 @@ for (i in 1:length(leading_edge)){
   g_list <- path_filter(trace)
   
   #store the genelists and subnets
-  leadingedge_genes[[leading_edge[[i]][2]]] <- g_list
-  leadingedge_subnets[[leading_edge[[i]][2]]] <- induced_subgraph(
-    network,
-    v=V(network)[names(V(network)) %in% g_list]
+  leading_genes[[leading_edge[[i]][2]]] <- g_list
+  leading_subnest[[leading_edge[[i]][2]]] <- induced_subgraph(
+    net,
+    v=V(net)[names(V(net)) %in% g_list]
   )
   
   ### Store the Trace

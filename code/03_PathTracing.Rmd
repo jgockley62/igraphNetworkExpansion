@@ -558,11 +558,6 @@ path_filter <-  function (indv_path, weights, lim ) {
 #'@param sentinals List of the sentinal genes to trace to eg. Sentinal
 short_paths <- function( tnet, target, targets, sentinals ){
   
-  target = genes[1]
-  tnet = net
-  targets = genes
-  sentinals = sentinal 
-  
   message( paste0( 'Working on: ', target))
   # Pull paths that have median OMICS Score. ( Need to integrate a Genetics+Genomics Measure )
   omics_scores <- setNames(V(tnet)$weight, V(tnet)$name)
@@ -583,12 +578,13 @@ short_paths <- function( tnet, target, targets, sentinals ){
   ) 
   
   #Calculate scores for the sentinal and target paths
-  scores <- do.call(c, parallel::mclapply( 
-    paths$res,  
-    path_calc, 
-    weights=omics_scores,
-    mc.cores = 14
-  ))
+  #scores <- do.call(c, parallel::mclapply( 
+  #  paths$res,  
+  #  path_calc, 
+  #  weights=omics_scores,
+  #  mc.cores = 14
+  #))
+  #Sys.sleep(2)
   sent_scores <- do.call(c, parallel::mclapply( 
     sent_paths$res,  
     path_calc, 
@@ -858,7 +854,7 @@ for (i in 1:length(all_goterms)). {
   
   ### Run a Trace
   trace <- lapply(genes, short_paths, tnet=net, targets=genes, sentinals=sentinal)
-  
+
   ### Filter the trace
   g_list <- trace_filter(trace)
   

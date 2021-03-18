@@ -359,6 +359,7 @@ find_limit <- function ( s_path, t_path, weights) {
     
     if ((length(t_path$res) == 1) & (length(t_path$res[[1]]) == 1)) {
       target_vertices <- NA
+      limit <- NA
     }else{
       target_vertices <- c(0,0,0)
       #set limit based on targets
@@ -642,6 +643,8 @@ prov <- githubr::getPermlink(repository = this_repo, repositoryPath = 'code/03_P
 
 ##### All Go Terms
 ## - Run the whole list
+time<-Sys.time()
+
 allgo_gene <- list()
 allgo_subnet <- list()
 for (i in 1:length(all_goterms)) {
@@ -719,6 +722,7 @@ for (i in 1:length(leading_edge)){
     subset = g_list
   ) 
 }
+Sys.time()-time
 
 ```
 

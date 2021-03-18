@@ -646,7 +646,7 @@ leading_edge <- list(
 )
 
 this_repo <- githubr::getRepo(repository = repo, ref="branch", refName='master')
-this_file <- githubr::getPermlink(repository = this_repo, repositoryPath = code)
+prov <- githubr::getPermlink(repository = this_repo, repositoryPath = code)
       
 ################################################################################
 
@@ -679,7 +679,10 @@ for (i in 1:length(all_goterms)) {
     p_id = 'syn25190666', folder = 'All Go Terms',
     act_name = 'Pathway Tracing Network', 
     act_desc = 'Simple Wthin Biodomain Tracing',
-    code = 'code/03_PathTracing.Rmd', repo = 'jgockley62/igraph_Network_Expansion', syn_used = all_goterms[[i]][1], 
+    code = NULL, 
+    repo = NULL,
+    prov_object = prov,
+    syn_used = all_goterms[[i]][1], 
     subset = g_list
   ) 
 }
@@ -719,7 +722,10 @@ for (i in 1:length(leading_edge)){
     p_id = 'syn25190666', folder = 'Leading Edge',
     act_name = 'Pathway Tracing Network', 
     act_desc = 'Simple Wthin Biodomain Tracing',
-    code = 'code/03_PathTracing.Rmd', repo = 'jgockley62/igraph_Network_Expansion', syn_used = leading_edge[[i]][1], 
+    code = NULL, 
+    repo = NULL,
+    prov_object = prov,
+    syn_used = leading_edge[[i]][1], 
     subset = g_list
   ) 
 }

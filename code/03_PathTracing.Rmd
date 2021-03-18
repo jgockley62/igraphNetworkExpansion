@@ -691,6 +691,9 @@ for (i in 1:length(all_goterms)) {
   ) 
 }
 
+A <- Sys.time()-time
+
+time<-Sys.time()
 
 leading_genes <- list()
 leading_subnest <- list()
@@ -733,7 +736,109 @@ for (i in 1:length(leading_edge)){
     subset = g_list
   ) 
 }
-Sys.time()-time
+B <- Sys.time()-time
 
+```
+```{r pairwise_run}
+
+##### All Go Terms
+## - Run the whole list
+time<-Sys.time()
+
+allgo_gene <- list()
+allgo_subnet <- list()
+all_genes <- NULL
+for (sent in 1:length(all_goterms)){
+  
+  g_list <- NULL
+  for (target in 1:length(all_goterms)){
+    if (sent==target){
+      
+    }else{
+      ### Load Lists:
+      genes <- list_load( all_goterms[[target]][1], net, is_syn = TRUE )
+      sentinal <-  list_load( all_goterms[[sent]][1], net, is_syn = TRUE )
+      
+      ### Run a Trace
+      trace <- lapply(genes, short_paths, tnet=net, targets=genes, sentinals=sentinal)
+    
+      ### Filter the trace
+      g_list <- c(g_list, trace_filter(trace))
+    }
+  }
+  
+  g_list <- g_list[!duplicated(g_list)]
+  
+  #store the genelists and subnets
+  allgo_gene[[all_goterms[[sent]][2]]] <- g_list
+  allgo_subnet[[all_goterms[[sent]][2]]] <- induced_subgraph(
+    net,
+    v=V(net)[names(V(net)) %in% g_list]
+  )
+  
+  all_genes <- c(all_genes, g_list)
+  
+  ### Store the Trace
+  store_net(
+    network = net,
+    net_filename=all_goterms[[sent]][2], net_synname=all_goterms[[sent]][3],
+    p_id = 'syn25190666', folder = 'All Go Term Pairwise Networks',
+    act_name = 'Pathway Tracing Network', 
+    act_desc = 'Simple Wthin Biodomain Tracing',
+    code = NULL, 
+    repo = NULL,
+    prov_object = prov,
+    syn_used = all_goterms[[sent]][1], 
+    subset = g_list
+  ) 
+
+}
+
+A <- Sys.time()-time
+
+time<-Sys.time()
+
+leading_genes <- list()
+leading_subnest <- list()
+##### Leading Edge
+for (sent in 1:length(leading_edge)){
+  for (target in 1:length(leading_edge)){
+  ### Load Lists:
+  genes <- list_load( leading_edge[[i]][1], net, is_syn = TRUE )
+  sentinal <-  list_load( leading_edge[[sent]][1], net, is_syn = TRUE )
+  
+  ### Run a Trace
+  trace <- lapply( genes, short_paths, tnet=net, targets=genes, sentinals=sentinal  )
+  
+  ### Filter the trace
+  g_list <- trace_filter(trace)
+  
+  #Sink_of_List_method <- g_list
+  #length(g_list)
+  # 449
+  
+  
+  #store the genelists and subnets
+  leading_genes[[leading_edge[[i]][2]]] <- g_list
+  leading_subnest[[leading_edge[[i]][2]]] <- induced_subgraph(
+    net,
+    v=V(net)[names(V(net)) %in% g_list]
+  )
+  
+  ### Store the Trace
+  store_net(
+    network = net,
+    net_filename=leading_edge[[i]][2], net_synname=leading_edge[[i]][3],
+    p_id = 'syn25190666', folder = 'Leading Edge',
+    act_name = 'Pathway Tracing Network', 
+    act_desc = 'Simple Wthin Biodomain Tracing',
+    code = NULL, 
+    repo = NULL,
+    prov_object = prov,
+    syn_used = leading_edge[[i]][1], 
+    subset = g_list
+  ) 
+}
+B <- Sys.time()-time
 ```
 

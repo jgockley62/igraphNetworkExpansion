@@ -90,14 +90,14 @@ if( Simple == 'YES' ){
 if( Filter_Edges == 'YES' ){
   #Net is: 13,867 Vertacies and 806,950 Edges
   # A)
-  # loose( 246 verticies ) -- A == 13621 Vertacies and 544871 Edges
+  # loose( 246 vertices ) -- A == 13621 Vertacies and 544871 Edges
   test_net <- igraph::subgraph.edges( net,
                               E(net)[ ( E(net)$EdgeRep == 1  & 
                                         E(net)$Occurance == 1 & 
                                         E(net)$Avg_Cortex_CE == 0 ) == F ],
                               delete.vertices = TRUE
                             )
-  # loose( 3053 verticies ) -- C 10,814 Vertacies and 179,148 Edges
+  # loose( 3053 vertices ) -- C 10,814 Vertacies and 179,148 Edges
   test_net <-  igraph::subgraph.edges( test_net,
                               E(test_net)[ ( E(test_net)$EdgeRep == 1  &
                                              E(test_net)$Occurance == 2 &
@@ -105,7 +105,7 @@ if( Filter_Edges == 'YES' ){
                               delete.vertices = TRUE
                             )
   #loose ( 424 vertacies )
-  #B 13,443 Verticies and 441,227 Edges
+  #B 13,443 vertices and 441,227 Edges
   #test_net <- subgraph.edges( net,
   #                            E(net)[ ( E(net)$EdgeRep == 1  &
   #                                      E(net)$Occurance == 2 & 
@@ -114,7 +114,7 @@ if( Filter_Edges == 'YES' ){
   #                          )
   
   # E)
-  # loose( 3691 verticies ) -- A == 10176 Vertacies and 151912 Edges
+  # loose( 3691 vertices ) -- A == 10176 Vertacies and 151912 Edges
   test_net <-  igraph::subgraph.edges( net,
                               E(net)[ ( E(net)$EdgeRep == 1  & 
                                         E(net)$Avg_Cortex_CE == 0 ) == F ],
@@ -127,7 +127,7 @@ if( Filter_Edges == 'YES' ){
 }
 
 
-#Annotate Verticies on Omics Weights:
+#Annotate vertices on Omics Weights:
 #_Old Omics Only#  OMICS <- read.csv(syn_temp$get('syn22758171')$path)
 OMICS_dep <- read.csv(syn_temp$get('syn22758171')$path)
 #SELECT * FROM syn23019621 WHERE GeneName in ('DDAH2', 'NAPG') 
@@ -206,11 +206,11 @@ vertex_attr(net, "Pro_Cor_EffectScore", index = V(net)) <- OMICS_alt[ names( V(n
 #' name per line
 #'
 #'@param file_path the igraph network to push to synapse eg. net
-#'@param network igraph network object to use to filter the Verticies From
+#'@param network igraph network object to use to filter the vertices From
 #'@param is_syn is the list a synapse ID default=FALSE
 list_load <- function (file_path, network, is_syn = FALSE) {
   #'@FilePath the path of the file to be loaded eg. '~/igraph_Network_Expansion/InputList/AD_Sentinel_List.txt'
-  #'@Net igraph network object to use to filter the Verticies From
+  #'@Net igraph network object to use to filter the vertices From
   
   if (isTRUE(is_syn)) {
     genes <- read.table(
@@ -257,7 +257,7 @@ path_calc <-  function (indv_path, weights) {
 #'@param indv_path the path of genes
 #'@param lim the value to out the path
 path_filter <-  function (indv_path, weights, lim ) {
-  scores <- omics_scores[names(indv_path)]
+  scores <- weights[names(indv_path)]
   
   #Filter out origin and terminus
   scores <- scores[1:(length(scores) -1)][-1]
@@ -270,7 +270,6 @@ path_filter <-  function (indv_path, weights, lim ) {
           )
     )
   }
-  #scores <- scores[ !(is.na(scores)) & scores > 0 ]
   scores <- scores[ !(is.na(scores)) ]
   if(length(scores) > 0){
     used <- 1
@@ -294,6 +293,119 @@ path_filter <-  function (indv_path, weights, lim ) {
   }
 }
 
+#' Finds the limit cutoff when target and sentinal paths are given
+#'
+#' @param vertices the vertices vector from find_limit
+#' @param path_obj pathtrace object from short_paths()
+#' @param lim the filter limit value
+#' @param path_name the name of the path for message (target or sentinal)
+#' @param weights the gene OMICS scores or score metric by verex to weight paths
+path_obj_filter <- function( path_obj, vertices, lim, path_name, weights ) {
+  ## Target path filtering
+  ## Target path filtering
+  if ((length(vertices) == 1) & 
+      is.na(vertices)[1]) {
+         message('Target Path Trace Returned No Paths')
+  }else{
+    # Filter the target Paths
+    fitlered_paths <- parallel::mclapply( 
+      path_obj$res,  
+      path_filter, 
+      lim=lim, 
+      weights=weights,
+      mc.cores = 14
+    ) 
+      
+    filter_summary <- do.call(Map, c(c, fitlered_paths))
+    
+    vertices <- filter_summary$Keep[ !duplicated(filter_summary$Keep)]
+    vertices <- vertices[!(is.na(vertices))]
+    
+    all_vertices <- filter_summary$Genes[ !duplicated(filter_summary$Genes)]
+    all_vertices <- all_vertices[!(is.na(all_vertices))]
+       
+    #Paths Kept - ISSUE Here
+    message(paste0(
+      sum(filter_summary$Passed),
+      " target paths out of ",
+      length(paths$res), 
+      " ( ",
+      signif(sum(filter_summary$Passed) / length(paths$res), 4) * 100,
+      "% ) kept"
+    ))
+      
+    #Genes Filtered Out
+    message(paste0(
+      length(all_vertices) - length(vertices),
+      ' of ',
+      length(all_vertices),
+      ' target genes ( ', signif((length(all_vertices) - length(vertices))/length(all_vertices), 4) * 100,
+      '% ) filtered out'
+    ))
+  }
+
+  return( vertices )
+}
+
+#' Finds the limit cutoff when target and sentinal paths are given
+#'
+#' @param s_path the sentinel path object
+#' @param t_path the target path object
+#' @param weights OMICS/vertex scores as named vector
+find_limit <- function ( s_path, t_path, weights) {
+  #if there are no sentinel paths return empty and look at target
+  if ((length(s_path$res) == 1) & (length(s_path$res[[1]]) == 1)) {
+    sent_keep_vertices <- NA
+    
+    if ((length(t_path$res) == 1) & (length(t_path$res[[1]]) == 1)) {
+      target_vertices <- NA
+    }else{
+      target_vertices <- c(0,0,0)
+      #set limit based on targets
+      scores <- do.call(c, parallel::mclapply( 
+        t_path$res,  
+        path_calc, 
+        weights=weights,
+        mc.cores = 14
+      ))
+    
+      # Look at limit of highest between mean or median non-zero sentinel paths
+      target_summary <- summary(
+        scores[(scores > 0) & (is.na(scores) == F)]
+      )
+      if (target_summary['Mean'] > target_summary['Median']) {
+        limit <- target_summary['Mean']
+      }else{
+        limit <- target_summary['Median']
+      }
+    }
+  }else{
+    target_vertices <- c(0,0,0)
+    sent_keep_vertices <- c(0,0,0)
+    sent_scores <- do.call(c, parallel::mclapply( 
+      s_path$res,  
+      path_calc, 
+      weights=weights,
+      mc.cores = 14
+    ))
+  
+    # Look at limit of highest between mean or median non-zero sentinal paths
+    sentinal_summary <- summary(
+      sent_scores[(sent_scores > 0) & (is.na(sent_scores) == F)]
+    )
+    if (sentinal_summary['Mean'] > sentinal_summary['Median']) {
+      limit <- sentinal_summary['Mean']
+    }else{
+      limit <- sentinal_summary['Median']
+    }
+  }
+  return(list(
+    cutoff = limit,
+    t_verts = target_vertices,
+    s_verts = sent_keep_vertices
+  ))
+}  
+
 #' Traces the shortest paths of the target gene pairwise to the sentinels
 #' Traces the the shortest paths of target gene paiwise to the target gene list
 #' Returns the list of genes in paths which score over the median of non-zero
@@ -302,10 +414,6 @@ path_filter <-  function (indv_path, weights, lim ) {
 #'@param target the from gene target eg Genes[1]
 #'@param targets List of the total list of targets in the User set eg. Genes
 #'@param sentinals List of the sentinal genes to trace to eg. Sentinal
-#target<-'PTK2B'
-tnet=net
-targets=genes
-sentinals=sentinal
 short_paths <- function( tnet, target, targets, sentinals ){
   
   message( paste0( 'Working on: ', target))
@@ -325,7 +433,7 @@ short_paths <- function( tnet, target, targets, sentinals ){
     mode = c("all")
   ) 
   
-  # All Shortest paths from target to Sentinal Genes
+  # All Shortest paths from target to Sentinel Genes
   sent_paths <- get.all.shortest.paths(
     snet,
     from = target,
@@ -333,150 +441,33 @@ short_paths <- function( tnet, target, targets, sentinals ){
     mode = c("all")
   )
   
-  #if there are no sentinel paths return empty and look at target
-  if ((length(sent_paths$res) == 1) & (length(sent_paths$res[[1]]) == 1)) {
-    sent_keep_verticies <- NA
-    
-    paths <- get.all.shortest.paths(
-      net,
-      from = target,
-      to = V(net)[ names(V(net)) %in% targets ],
-      mode = c("all")
-    )
-    
-    if ((length(paths$res) == 1) & (length(paths$res[[1]]) == 1)) {
-      keep_verticies <- NA
-    }else{
-      keep_verticies <- c(0,0,0)
-      #set limit based on targets
-      scores <- do.call(c, parallel::mclapply( 
-        paths$res,  
-        path_calc, 
-        weights=omics_scores,
-        mc.cores = 14
-      ))
-    
-      # Look at limit of highest between mean or median non-zero sentinel paths
-      target_summary <- summary(
-        sent_scores[(scores > 0) & (is.na(scores) == F)]
-      )
-      if (target_summary['Mean'] > target_summary['Median']) {
-        limit <- target_summary['Mean']
-      }else{
-        limit <- target_summary['Median']
-      }
-    }
-  }else{
-    keep_verticies <- c(0,0,0)
-    sent_keep_verticies <- c(0,0,0)
-    sent_scores <- do.call(c, parallel::mclapply( 
-      sent_paths$res,  
-      path_calc, 
-      weights=omics_scores,
-      mc.cores = 14
-    ))
-  
-    # Look at limit of highest between mean or median non-zero sentinal paths
-    sentinal_summary <- summary(
-      sent_scores[(sent_scores > 0) & (is.na(sent_scores) == F)]
-    )
-    if (sentinal_summary['Mean'] > sentinal_summary['Median']) {
-      limit <- sentinal_summary['Mean']
-    }else{
-      limit <- sentinal_summary['Median']
-    }
-  }
+  ## Find the limit cut off
+  cutoff_obj <- find_limit(
+    s_path = sent_paths,
+    t_path = paths,
+    weights = omics_scores
+  )
   
   ## Target path filtering
-  if ((length(keep_verticies) == 1) & 
-      is.na(keep_verticies)[1]) {
-         message('Target Path Trace Returned No Paths')
-  }else{
-    # Filter the target Paths
-    fitlered_paths <- parallel::mclapply( 
-      paths$res,  
-      path_filter, 
-      lim=limit, 
-      weights=omics_scores,
-      mc.cores = 14
-    ) 
-      
-    filter_summary <- do.call(Map, c(c, fitlered_paths))
-    
-    keep_verticies <- filter_summary$Keep[ !duplicated(filter_summary$Keep)]
-    keep_verticies <- keep_verticies[!(is.na(keep_verticies))]
-    
-    all_verticies <- filter_summary$Genes[ !duplicated(filter_summary$Genes)]
-    all_verticies <- all_verticies[!(is.na(all_verticies))]
-       
-    #Paths Kept - ISSUE Here
-    message(paste0(
-      sum(filter_summary$Passed),
-      " target paths out of ",
-      length(paths$res), 
-      " ( ",
-      signif(sum(filter_summary$Passed) / length(paths$res), 4) * 100,
-      "% ) kept"
-    ))
-      
-    #Genes Filtered Out
-    message(paste0(
-      length(all_verticies) - length(keep_verticies),
-      ' of ',
-      length(all_verticies),
-      ' target genes ( ', signif((length(all_verticies) - length(keep_verticies))/length(all_verticies), 4) * 100,
-      '% ) filtered out'
-    ))
-  }
-
+  t_vertices <- path_obj_filter(
+    path_obj = paths,
+    vertices = cutoff_obj$t_verts,
+    lim = cutoff_obj$cutoff,
+    path_name ='target',
+    weights = omics_scores
+  )
   
-  ## Sentinel path filtering
-  if ((length(sent_keep_verticies) == 1) & 
-      is.na(sent_keep_verticies)[1]) {
-         message('Sentinel Path Trace Returned No Paths')
-  }else{
-    # Filter the Sentinel Paths
-    sent_fitlered_paths <- parallel::mclapply( 
-      sent_paths$res,  
-      path_filter, 
-      lim=limit, 
-      weights=omics_scores,
-      mc.cores = 14
-    ) 
-    
-    sent_filter_summary <- do.call(Map, c(c, sent_fitlered_paths))
+  ## Sentinal path filtering
+  s_vertices <- path_obj_filter(
+    path_obj = sent_paths,
+    vertices = cutoff_obj$s_verts,
+    lim = cutoff_obj$cutoff,
+    path_name ='sentinel',
+    weights = omics_scores
+  )
   
-    sent_keep_verticies <- sent_filter_summary$Keep[ !duplicated(sent_filter_summary$Keep)]
-    sent_keep_verticies <- sent_keep_verticies[!(is.na(sent_keep_verticies))]
-  
-    sent_all_verticies <- sent_filter_summary$Genes[ !duplicated(sent_filter_summary$Genes)]
-    sent_all_verticies <- all_verticies[!(is.na(sent_all_verticies))]
-    
-    #Paths Kept
-    message(paste0(
-      sum(sent_filter_summary$Passed),
-      " sentinal paths out of ",
-      length(sent_paths$res), 
-      " ( ",
-      signif(sum(sent_filter_summary$Passed) / length(sent_paths$res), 4) * 100,
-      "% ) kept"
-    ))
-    
-    #Genes Filtered Out
-    message(paste0(
-      length(sent_all_verticies) - length(sent_keep_verticies),
-      ' of ',
-      length(sent_all_verticies),
-      ' sentinal genes ( ', 
-      signif((length(sent_all_verticies) - length(sent_keep_verticies)) / length(sent_all_verticies), 4) * 100,
-      '% ) filtered out'
-    ))
-  }
-  return(list( Inter = keep_verticies, Sentinal=sent_keep_verticies))
+  return(list( Inter = t_vertices, Sentinal=s_vertices))
 }
-
-#test_trace <- lapply( genes, short_paths, tnet=net, targets=genes, sentinals=sentinal  )
-#test_trace_sink <- test_trace
 
 #'Process a path trace list
 #'
@@ -509,7 +500,6 @@ trace_filter <- function (path_obj) {
     ]
   return(gene_list)
 }
-
 
 #'Push Network to Synapse
 #'
@@ -645,8 +635,8 @@ leading_edge <- list(
   c('syn25185317', "Vascular_Function", "Vascular Function")
 )
 
-this_repo <- githubr::getRepo(repository = repo, ref="branch", refName='master')
-prov <- githubr::getPermlink(repository = this_repo, repositoryPath = code)
+this_repo <- githubr::getRepo(repository = 'jgockley62/igraph_Network_Expansion', ref="branch", refName='master')
+prov <- githubr::getPermlink(repository = this_repo, repositoryPath = 'code/03_PathTracing.Rmd')
       
 ################################################################################
 

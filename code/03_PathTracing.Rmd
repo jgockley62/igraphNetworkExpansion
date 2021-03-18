@@ -328,9 +328,9 @@ path_obj_filter <- function( path_obj, vertices, lim, path_name, weights ) {
     message(paste0(
       sum(filter_summary$Passed),
       " target paths out of ",
-      length(paths$res), 
+      length(path_obj$res), 
       " ( ",
-      signif(sum(filter_summary$Passed) / length(paths$res), 4) * 100,
+      signif(sum(filter_summary$Passed) / length(path_obj$res), 4) * 100,
       "% ) kept"
     ))
       

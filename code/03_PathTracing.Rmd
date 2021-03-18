@@ -194,275 +194,7 @@ OMICS_alt$RNA_TE_Cor <- OMICS_alt$RNA_TE
 
 vertex_attr(net, "RNA_Cor_EffectScore", index = V(net)) <- OMICS_alt[ names( V(net)), ]$RNA_TE_Cor
 vertex_attr(net, "Pro_Cor_EffectScore", index = V(net)) <- OMICS_alt[ names( V(net)), ]$PRO_TE_Cor 
-ListLoad <- function( FilePath, Net ){
-  #'@FilePath the path of the file to be loaded eg. '~/igraph_Network_Expansion/InputList/AD_Sentinel_List.txt'
-  #'@Net igraph network object to use to filter the Verticies From
-  
-  Genes <- read.table(file=FilePath,
-                    header=F,
-                    sep='\n',
-                    stringsAsFactors = F
-                  )[,1]
-
-  #Genes in network
-  Tot <- length(Genes)
-  Perc <- length(Genes[ Genes %in% names(V(Net)) ]) / length(Genes)
-  Numb <- length(Genes[ Genes %in% names(V(Net)) ])
-
-  Genes <- Genes[ Genes %in% names( V(Net) ) ]
-
-  writeLines(paste0( Numb, 
-                   ' of ', 
-                   Tot, 
-                   ' (', signif(Perc, digits = 4)*100,
-                   '%) genes from the list appear in the primary network' )
-           )
-  return( Genes )
-}
-
-# Lists Loaded HERE:
-#Genes <- ListLoad( '~/igraph_Network_Expansion/InputList/AD_PD_Full.txt', net )
-#Sentinal <- ListLoad( '~/igraph_Network_Expansion/InputList/AD_Sentinel_List.txt', net )
-
-Genes <- ListLoad( '~/igraph_Network_Expansion/InputList/BiodomainLists/AllGoTerm/APP_Metabolism.txt', net )
-Sentinal <- ListLoad( '~/igraph_Network_Expansion/InputList/BiodomainLists/AllGoTerm/APP_Metabolism.txt', net )
 ```
-
-```{r pathTrace }
-Name_Pull <- function( Char ){
-  #'@Char is a list entry from get.all.shortest.paths()
-  return( names( Char ) )
-}
-
-Path_Calc <- function( Item, NET ){
-  #'@Item a list entry of the path list eg. paths$res[[1]]
-  #'@NET the network to query eg. Net or net
-  
-  #Item <- paths$res[[1]]
-  #NET <- Net
-  
-  ##--## MEAN <- mean( V(NET)[ names(V(NET)) %in% names(Item) ]$weight )
-  # - Look at Mean of non-zero:
-  MEAN <- mean( V(NET)[ names(V(NET)) %in% names(Item) ]$weight[ V(NET)[ names(V(NET)) %in% names(Item) ]$weight > 0 ] )
-  return( MEAN )
-}
-
-Short_Paths <- function( Net, target, targets, sentinals ){
-  #'@Net igraph network (Main entire network) eg. net/net_undirected/JS_net_undirected
-  #'@target the from gene target eg Genes[1]
-  #'@targets List of the total list of targets in the User set eg. Genes
-  #'@sentinals List of the sentinal genes to trace to eg. Sentinal
-  
-  #Net <- net
-  #target <- Genes[1] #'PLXNA1'
-  #targets <- Genes
-  #sentinals <- Sentinal
-  #paths <- all_simple_paths(Net, 
-  #                     from=target,
-  #                     to = V(Net)[ names(V(Net)) %in% targets ],
-  #                     mode = c("all")
-  #                    ) 
-  
-  message( paste0( 'Working on: ', target))
-  paths <- get.all.shortest.paths(Net, 
-                       from=target,
-                      to = V(Net)[ names(V(Net)) %in% targets ],
-                       mode = c("all")
-                      ) 
-  
-  #Sent_paths <- all_simple_paths(Net, 
-  #                     from=target,
-  #                     to = V(Net)[ names(V(Net)) %in% sentinals ],
-  #                     mode = c("all")
-  #                    ) 
-  Sent_paths <- get.all.shortest.paths(Net, 
-                       from=target,
-                       to = V(Net)[ names(V(Net)) %in% sentinals ],
-                       mode = c("all")
-                     ) 
-  
-  Sent_Scores <- unlist( lapply( Sent_paths$res, Path_Calc, NET=Net ) )
-  ##--## Limit <- median(Sent_Scores[ is.na(Sent_Scores) == F ])
-  # - Look at limit of median non-zero paths
-  Limit <- median(Sent_Scores[ Sent_Scores > 0 & is.na(Sent_Scores) == F ])
-  Scores <- unlist( lapply( paths$res, Path_Calc, NET=Net ) )
-  
-  # Pull paths that have median OMICS Score. ( Need to integrate a Genetics+Genomics Measure )
-  Keeps <- NULL
-  OGs <- NULL
-  Tracker <- 0
-  for( i in 1:length(paths$res) ){
-    if( is.na(Path_Calc( paths$res[[i]], Net ))==F ){
-      OGs <- c( OGs, names(paths$res[[i]]))
-      if( Path_Calc( paths$res[[i]], Net ) > Limit ){
-        OGs <- c( OGs, names(paths$res[[i]]))
-        Keeps <- c( Keeps, names(paths$res[[i]]))
-        Tracker <- Tracker+1
-      }else{
-        OGs <- c( OGs, names(paths$res[[i]]))
-      }
-    }else{ OGs <- c( OGs, names(paths$res[[i]])) }
-  }
-  message( paste0( Tracker, " target paths out of ",
-                   length(paths$res), " ( ",
-                   signif( Tracker/length(paths$res), 4)*100, "% ) kept"
-                  ))
-  
-  Keeps <- Keeps[ !duplicated(Keeps) ]
-  OGs <- OGs[!duplicated(OGs)]
-  
-  message( 
-    paste0( length(OGs)-length(Keeps), ' of ', length(OGs),
-            ' target genes ( ', signif( (length(OGs)-length(Keeps))/length(OGs), 4)*100,
-            '% ) filtered out'
-          )
-    )
-  
-  #Names <- unlist( lapply( paths$res, Name_Pull ) )
-  #Names <- Names[ !duplicated(Names) ]
-  
-  SNames <- NULL
-  STracker <- 0
-  sOGs <- NULL
-  for( i in 1:length(Sent_paths$res) ){
-    as.character( names(Sent_paths$res[[i]]) )
-    sOGs <- c( sOGs, names(Sent_paths$res[[i]]))
-    
-    if( mean( V(Net)[ names(V(Net)) %in% as.character( names(Sent_paths$res[[i]]) ) ]$weight ) > as.numeric( summary( Sent_Scores )[2] ) ){
-      STracker <- STracker+1
-      SNames <- c( SNames, as.character( names(Sent_paths$res[[i]]) ) )
-    }else{
-    }
-  }
-  
-  #SNames <- unlist( lapply( Sent_paths$res, Name_Pull ) )
-  SNames <- SNames[ !duplicated(SNames) ]
-  sOGs <- sOGs[ !duplicated(sOGs) ]
-
-  message( paste0( STracker, " Sentinal paths out of ",
-                   length(Sent_paths$res), " ( ",
-                   signif( STracker/length(Sent_paths$res), 4)*100, "% ) kept"
-                  ))
-  
-  message( 
-    paste0( length(sOGs)-length(SNames), ' of ', length(sOGs),
-            ' target genes ( ', signif( (length(sOGs)-length(SNames))/length(sOGs), 4)*100,
-            '% ) filtered out'
-          )
-    )
-  
-  return(list( Inter = Keeps, Sentinal=SNames))
-}
-
-test <- lapply( Genes, Short_Paths, Net=net, targets=Genes, sentinals=Sentinal  )
-
-#collapse Pairwise Pass genes and Sentinal Path Genes
-List_Targets <- NULL
-Sentinal_Targets <- NULL
-Len_LTs <- NULL
-Len_STs <- NULL
-for( i in 1:length(test) ){
-  
-  Len_LTs <- c( Len_LTs, length( test[[i]]$Inter ) )
-  Len_STs <- c( Len_STs, length( test[[i]]$Sentinal ) )
-  List_Targets <- c(List_Targets, test[[i]]$Inter)
-  Sentinal_Targets <- c(Sentinal_Targets, test[[i]]$Sentinal)
-
-}
-
-length( List_Targets[!duplicated(List_Targets)] )
-length( Sentinal_Targets[!duplicated(Sentinal_Targets)] )
-
-table( List_Targets[!duplicated(List_Targets)] %in% Sentinal_Targets[!duplicated(Sentinal_Targets)] )
-
-#### Full
-# LTs = 1727
-# STs = 1292
-# Overlap = 944 
-# Full_LTs <- Len_LTs
-# Full_STs <- Len_STs
-
-#### Path-Calc - Look at Mean of non-zero
-# LTs = 1736
-# STs = 1292
-# Overlap = 954
-# PCmN0_LTs <- 
-# PCmN0_STs <- 
-
-
-#### Path-Calc - Look at Mean of non-zero And Limit to GT 0s
-# LTs = 
-# STs = 
-# Overlap = 
-# PCmN0_LTs <- 
-# PCmN0_STs <- 
-
-
-#test <- unlist( lapply( Genes, Short_Paths, Net=net, targets=Genes, sentinals=Sentinal  ) )
-#test <- test[ !duplicated(test) ]
-
-test <- Sentinal_Targets[!duplicated(Sentinal_Targets)][ 
-  Sentinal_Targets[ !duplicated(Sentinal_Targets) ] %in% 
-    List_Targets[ !duplicated(List_Targets) ]
-  ]
-
-#_Annotate the Network with the core
-net <- set_vertex_attr( net, "Core", value = 'No' )
-net <- set_vertex_attr( net, "Core", index = V(net)[ names(V(net)) %in% test ], value = 'Yes' )
-
-#subgraph(graph, v)
-# Grow Network 5 Steps out:
-Grow_Net <- function( Net, Order, List ){
-  #'@Net The igraph network object eg. net
-  #'@Order the order of Steps you want to grow the network eg. 1
-  #'@List the list of genes to seed and grow by eg. test
-  
-  ext <- make_ego_graph(net, order = Order, nodes = V(Net)[ names(V(Net)) %in% List ], mode = "all" )
-  
-  Verticies <- NULL
-  for( i in 1:length(ext) ){
-    Verticies <- c( Verticies, names( V(ext[[i]]) ) )
-  }
-  return( Verticies[ !duplicated(Verticies) ] )
-  
-}
-
-Expand <- list( One = Grow_Net( net, 1, test ),
-                Two = Grow_Net( net, 2, test ),
-                Three = Grow_Net( net, 3, test ),
-                Four = Grow_Net( net, 4, test ),
-                Five = Grow_Net( net, 5, test )
-              )
-
-lengths <- unlist( lapply( Expand, length ) ) 
-
-# cut the list object if it maxes out
-if( as.numeric(table(max(lengths) %in% lengths)[TRUE]) > 1 ){
-  Inds <- which( lengths == max(lengths) )
-  Expand <- Expand[ 1:min(Inds) ]
-}
-
-#Unique_Expanded_Levels
-for( i in length(Expand):2 ){
-  Expand[[i]] <- Expand[[i]][ ( Expand[[i]] %in% Expand[[i-1]] )==F ]
-}
-Expand[[1]] <- Expand[[1]][ ( Expand[[1]] %in% names(V(net)[ names(V(net)) %in% test ]) )==F ]
-
-Total_Genes <- c( names(V(net)[ names(V(net)) %in% test ]), unlist(Expand) )
-sub_net <- induced_subgraph( net, v=V(net)[ names(V(net)) %in% Total_Genes ] )
-#Annotate Verticies with Expanded Desiganation
-
-#  _ Annotate the Network with the core
-
-sub_net <- set_vertex_attr( sub_net, "Expanded", value = 'NA' )
-sub_net <- set_vertex_attr( sub_net, "Core", index = V(sub_net)[ names(V(sub_net)) %in% test ], value = 0 ) 
-
-for( i in 1:length(Expand) ){
-  sub_net <- set_vertex_attr( sub_net, "Core", index = V(sub_net)[ names(V(sub_net)) %in% Expand[[i]] ], value = i ) 
-
-}
-```
-
 
 ```{r functions }
 #'Loads gene list
@@ -476,7 +208,6 @@ for( i in 1:length(Expand) ){
 #'@param file_path the igraph network to push to synapse eg. net
 #'@param network igraph network object to use to filter the Verticies From
 #'@param is_syn is the list a synapse ID default=FALSE
-
 list_load <- function (file_path, network, is_syn = FALSE) {
   #'@FilePath the path of the file to be loaded eg. '~/igraph_Network_Expansion/InputList/AD_Sentinel_List.txt'
   #'@Net igraph network object to use to filter the Verticies From
@@ -514,8 +245,10 @@ name_pull <- function( char ){
 #' Calculate the OMICS Scores across paths
 #' @param indv_path an indv path
 #' @param weights the omics scores as a gene-named vector
-path_calc <-  function (indv_path, weights ) {
+path_calc <-  function (indv_path, weights) {
   scores <- weights[names(indv_path)]
+  #Trim off the search genes....
+  scores <- scores[1:(length(scores) -1)][-1]
   scores <- mean(scores[ !(is.na(scores)) & scores > 0 ])
   return(scores)
 }
@@ -525,7 +258,20 @@ path_calc <-  function (indv_path, weights ) {
 #'@param lim the value to out the path
 path_filter <-  function (indv_path, weights, lim ) {
   scores <- omics_scores[names(indv_path)]
-  scores <- scores[ !(is.na(scores)) & scores > 0 ]
+  
+  #Filter out origin and terminus
+  scores <- scores[1:(length(scores) -1)][-1]
+  if(length(scores) == 0){
+    return(
+      list( Keep = names(indv_path),
+            Genes = names(indv_path),
+            Used = 1,
+            Passed = 1
+          )
+    )
+  }
+  #scores <- scores[ !(is.na(scores)) & scores > 0 ]
+  scores <- scores[ !(is.na(scores)) ]
   if(length(scores) > 0){
     used <- 1
   }else{ used <- 0 }
@@ -556,125 +302,176 @@ path_filter <-  function (indv_path, weights, lim ) {
 #'@param target the from gene target eg Genes[1]
 #'@param targets List of the total list of targets in the User set eg. Genes
 #'@param sentinals List of the sentinal genes to trace to eg. Sentinal
+#target<-'PTK2B'
+tnet=net
+targets=genes
+sentinals=sentinal
 short_paths <- function( tnet, target, targets, sentinals ){
   
   message( paste0( 'Working on: ', target))
   # Pull paths that have median OMICS Score. ( Need to integrate a Genetics+Genomics Measure )
   omics_scores <- setNames(V(tnet)$weight, V(tnet)$name)
-
-  # All Shortest paths from target to Target Genes
-  paths <- get.all.shortest.paths(
+  
+  # All Shortest paths from target to Target Genes directed
+  snet <- igraph::simplify(
     tnet,
+    remove.multiple = TRUE,
+    remove.loops = FALSE,
+  )
+  paths <- get.all.shortest.paths(
+    snet,
     from = target,
-    to = V(tnet)[ names(V(tnet)) %in% targets ],
+    to = V(snet)[ names(V(snet)) %in% targets ],
     mode = c("all")
   ) 
+  
   # All Shortest paths from target to Sentinal Genes
   sent_paths <- get.all.shortest.paths(
-    tnet,
+    snet,
     from = target,
-    to = V(tnet)[ names(V(tnet)) %in% sentinals ],
+    to = V(snet)[ names(V(snet)) %in% sentinals ],
     mode = c("all")
-  ) 
-  
-  #Calculate scores for the sentinal and target paths
-  #scores <- do.call(c, parallel::mclapply( 
-  #  paths$res,  
-  #  path_calc, 
-  #  weights=omics_scores,
-  #  mc.cores = 14
-  #))
-  #Sys.sleep(2)
-  sent_scores <- do.call(c, parallel::mclapply( 
-    sent_paths$res,  
-    path_calc, 
-    weights=omics_scores,
-    mc.cores = 14
-  ))
-  
-  # Look at limit of highest between mean or median non-zero sentinal paths
-  sentinal_summary <- summary(
-    sent_scores[(sent_scores > 0) & (is.na(sent_scores) == F)]
   )
-  if (sentinal_summary['Mean'] > sentinal_summary['Median']) {
-    limit <- sentinal_summary['Mean']
+  
+  #if there are no sentinel paths return empty and look at target
+  if ((length(sent_paths$res) == 1) & (length(sent_paths$res[[1]]) == 1)) {
+    sent_keep_verticies <- NA
+    
+    paths <- get.all.shortest.paths(
+      net,
+      from = target,
+      to = V(net)[ names(V(net)) %in% targets ],
+      mode = c("all")
+    )
+    
+    if ((length(paths$res) == 1) & (length(paths$res[[1]]) == 1)) {
+      keep_verticies <- NA
+    }else{
+      keep_verticies <- c(0,0,0)
+      #set limit based on targets
+      scores <- do.call(c, parallel::mclapply( 
+        paths$res,  
+        path_calc, 
+        weights=omics_scores,
+        mc.cores = 14
+      ))
+    
+      # Look at limit of highest between mean or median non-zero sentinel paths
+      target_summary <- summary(
+        sent_scores[(scores > 0) & (is.na(scores) == F)]
+      )
+      if (target_summary['Mean'] > target_summary['Median']) {
+        limit <- target_summary['Mean']
+      }else{
+        limit <- target_summary['Median']
+      }
+    }
   }else{
-    limit <- sentinal_summary['Median']
+    keep_verticies <- c(0,0,0)
+    sent_keep_verticies <- c(0,0,0)
+    sent_scores <- do.call(c, parallel::mclapply( 
+      sent_paths$res,  
+      path_calc, 
+      weights=omics_scores,
+      mc.cores = 14
+    ))
+  
+    # Look at limit of highest between mean or median non-zero sentinal paths
+    sentinal_summary <- summary(
+      sent_scores[(sent_scores > 0) & (is.na(sent_scores) == F)]
+    )
+    if (sentinal_summary['Mean'] > sentinal_summary['Median']) {
+      limit <- sentinal_summary['Mean']
+    }else{
+      limit <- sentinal_summary['Median']
+    }
   }
   
-  ## Target path. filtering
-  fitlered_paths <- parallel::mclapply( 
-    paths$res,  
-    path_filter, 
-    lim=limit, 
-    weights=omics_scores,
-    mc.cores = 14
-  ) 
-  
-  filter_summary <- do.call(Map, c(c, fitlered_paths))
+  ## Target path filtering
+  if ((length(keep_verticies) == 1) & 
+      is.na(keep_verticies)[1]) {
+         message('Target Path Trace Returned No Paths')
+  }else{
+    # Filter the target Paths
+    fitlered_paths <- parallel::mclapply( 
+      paths$res,  
+      path_filter, 
+      lim=limit, 
+      weights=omics_scores,
+      mc.cores = 14
+    ) 
+      
+    filter_summary <- do.call(Map, c(c, fitlered_paths))
+    
+    keep_verticies <- filter_summary$Keep[ !duplicated(filter_summary$Keep)]
+    keep_verticies <- keep_verticies[!(is.na(keep_verticies))]
+    
+    all_verticies <- filter_summary$Genes[ !duplicated(filter_summary$Genes)]
+    all_verticies <- all_verticies[!(is.na(all_verticies))]
+       
+    #Paths Kept - ISSUE Here
+    message(paste0(
+      sum(filter_summary$Passed),
+      " target paths out of ",
+      length(paths$res), 
+      " ( ",
+      signif(sum(filter_summary$Passed) / length(paths$res), 4) * 100,
+      "% ) kept"
+    ))
+      
+    #Genes Filtered Out
+    message(paste0(
+      length(all_verticies) - length(keep_verticies),
+      ' of ',
+      length(all_verticies),
+      ' target genes ( ', signif((length(all_verticies) - length(keep_verticies))/length(all_verticies), 4) * 100,
+      '% ) filtered out'
+    ))
+  }
 
-  keep_verticies <- filter_summary$Keep[ !duplicated(filter_summary$Keep)]
-  keep_verticies <- keep_verticies[!(is.na(keep_verticies))]
-
-  all_verticies <- filter_summary$Genes[ !duplicated(filter_summary$Genes)]
-  all_verticies <- all_verticies[!(is.na(all_verticies))]
-   
-  #Paths Kept
-  message(paste0(
-    sum(filter_summary$Passed),
-    " target paths out of ",
-    length(paths$res), 
-    " ( ",
-    signif(sum(filter_summary$Passed) / length(paths$res), 4) * 100,
-    "% ) kept"
-  ))
   
-  #Genes Filtered Out
-  message(paste0(
-    length(all_verticies) - length(keep_verticies),
-    ' of ',
-    length(all_verticies),
-    ' target genes ( ', signif((length(all_verticies) - length(keep_verticies))/length(all_verticies), 4) * 100,
-    '% ) filtered out'
-  ))
+  ## Sentinel path filtering
+  if ((length(sent_keep_verticies) == 1) & 
+      is.na(sent_keep_verticies)[1]) {
+         message('Sentinel Path Trace Returned No Paths')
+  }else{
+    # Filter the Sentinel Paths
+    sent_fitlered_paths <- parallel::mclapply( 
+      sent_paths$res,  
+      path_filter, 
+      lim=limit, 
+      weights=omics_scores,
+      mc.cores = 14
+    ) 
+    
+    sent_filter_summary <- do.call(Map, c(c, sent_fitlered_paths))
   
-  ## Sentinal path. filtering
-  sent_fitlered_paths <- parallel::mclapply( 
-    sent_paths$res,  
-    path_filter, 
-    lim=limit, 
-    weights=omics_scores,
-    mc.cores = 14
-  ) 
+    sent_keep_verticies <- sent_filter_summary$Keep[ !duplicated(sent_filter_summary$Keep)]
+    sent_keep_verticies <- sent_keep_verticies[!(is.na(sent_keep_verticies))]
   
-  sent_filter_summary <- do.call(Map, c(c, sent_fitlered_paths))
-
-  sent_keep_verticies <- sent_filter_summary$Keep[ !duplicated(sent_filter_summary$Keep)]
-  sent_keep_verticies <- keep_verticies[!(is.na(sent_keep_verticies))]
-
-  sent_all_verticies <- sent_filter_summary$Genes[ !duplicated(sent_filter_summary$Genes)]
-  sent_all_verticies <- all_verticies[!(is.na(sent_all_verticies))]
-  
-  #Paths Kept
-  message(paste0(
-    sum(sent_filter_summary$Passed),
-    " sentinal paths out of ",
-    length(sent_paths$res), 
-    " ( ",
-    signif(sum(sent_filter_summary$Passed) / length(sent_paths$res), 4) * 100,
-    "% ) kept"
-  ))
-  
-  #Genes Filtered Out
-  message(paste0(
-    length(sent_all_verticies) - length(sent_keep_verticies),
-    ' of ',
-    length(sent_all_verticies),
-    ' sentinal genes ( ', 
-    signif((length(sent_all_verticies) - length(sent_keep_verticies)) / length(sent_all_verticies), 4) * 100,
-    '% ) filtered out'
-  ))
-  
+    sent_all_verticies <- sent_filter_summary$Genes[ !duplicated(sent_filter_summary$Genes)]
+    sent_all_verticies <- all_verticies[!(is.na(sent_all_verticies))]
+    
+    #Paths Kept
+    message(paste0(
+      sum(sent_filter_summary$Passed),
+      " sentinal paths out of ",
+      length(sent_paths$res), 
+      " ( ",
+      signif(sum(sent_filter_summary$Passed) / length(sent_paths$res), 4) * 100,
+      "% ) kept"
+    ))
+    
+    #Genes Filtered Out
+    message(paste0(
+      length(sent_all_verticies) - length(sent_keep_verticies),
+      ' of ',
+      length(sent_all_verticies),
+      ' sentinal genes ( ', 
+      signif((length(sent_all_verticies) - length(sent_keep_verticies)) / length(sent_all_verticies), 4) * 100,
+      '% ) filtered out'
+    ))
+  }
   return(list( Inter = keep_verticies, Sentinal=sent_keep_verticies))
 }
 
@@ -728,10 +525,12 @@ trace_filter <- function (path_obj) {
 #'@param repo the repo which generated the network for the provenance (optional)
 #'@param syn_used character vector of synIDs to seed the provenance (optional)
 #'@param subset An vector of vertex names to filter the network for (optional) eg. test
+#'@param prov_object A pre made github code provenance object or vector of objects
 store_net <- function (network, net_filename, net_synname,
                        p_id, folder, act_name, act_desc,
                        code=NULL, repo=NULL,
-                       syn_used=NULL, subset=NULL) {
+                       syn_used=NULL, subset=NULL,
+                       prov_object = NULL) {
   #Set Activity
   activity <- syn_temp$store(synapseclient$Folder(name = folder, parentId = p_id))
   
@@ -776,11 +575,15 @@ store_net <- function (network, net_filename, net_synname,
   )
 
   # Github link - "jgockley62/igraph_Network_Expansion" 
-  if (!is.null(repo) | !is.null(code)) {
-    this_repo <- githubr::getRepo(repository = repo, ref="branch", refName='master')
-    this_file <- githubr::getPermlink(repository = this_repo, repositoryPath = code)
+  if (is.null(prov_object)) {
+    if (!is.null(repo) | !is.null(code)) {
+      this_repo <- githubr::getRepo(repository = repo, ref="branch", refName='master')
+      this_file <- githubr::getPermlink(repository = this_repo, repositoryPath = code)
+    }else{
+      this_file <- NULL
+    }
   }else{
-    this_file <- NULL
+    this_file <- prov_object
   }
   
   # write file
@@ -802,7 +605,9 @@ store_net <- function (network, net_filename, net_synname,
   )
 
 }
+```
 
+```{r runcode}
 ################################################################################
 # Assemble the List Object to Call all nets
 all_goterms <- list(
@@ -840,14 +645,16 @@ leading_edge <- list(
   c('syn25185317', "Vascular_Function", "Vascular Function")
 )
 
+this_repo <- githubr::getRepo(repository = repo, ref="branch", refName='master')
+this_file <- githubr::getPermlink(repository = this_repo, repositoryPath = code)
+      
 ################################################################################
 
 ##### All Go Terms
 ## - Run the whole list
 allgo_gene <- list()
 allgo_subnet <- list()
-for (i in 1:length(all_goterms)). {
-  
+for (i in 1:length(all_goterms)) {
   ### Load Lists:
   genes <- list_load( all_goterms[[i]][1], net, is_syn = TRUE )
   sentinal <-  list_load( all_goterms[[i]][1], net, is_syn = TRUE )
@@ -891,7 +698,12 @@ for (i in 1:length(leading_edge)){
   trace <- lapply( genes, short_paths, tnet=net, targets=genes, sentinals=sentinal  )
   
   ### Filter the trace
-  g_list <- path_filter(trace)
+  g_list <- trace_filter(trace)
+  
+  #Sink_of_List_method <- g_list
+  #length(g_list)
+  # 449
+  
   
   #store the genelists and subnets
   leading_genes[[leading_edge[[i]][2]]] <- g_list
@@ -914,189 +726,3 @@ for (i in 1:length(leading_edge)){
 
 ```
 
-```{r synapsePush }
-### Store Net: 
-store_net(
-  network = net,
-  net_filename='APP_Metabolism', net_synname='APP Metabolism',
-  p_id = 'syn25190666', folder = 'All Go Terms',
-  act_name = 'Pathway Tracing Network', 
-  act_desc = 'Simple Wthin Biodomain Tracing',
-  code = 'code/03_PathTracing.Rmd', repo = 'jgockley62/igraph_Network_Expansion', syn_used = 'syn25190694', 
-  subset = test
-) 
-
-
-
-
-
-
-parentId <- 'syn21534582'
-activityName = 'Igraph_Full_Networks';
-activityDescription = 'Full Protein-Protein Nets';
-CODE <- syn_temp$store(synapseclient$Folder(name = "igraphData", parentId = parentId))
-
-thisFileName <- '03_PathTracing.Rmd'
-
-# Github link
-thisRepo <- githubr::getRepo(repository = "jgockley62/igraph_Network_Expansion", ref="branch", refName='master')
-thisFile <- githubr::getPermlink(repository = thisRepo, repositoryPath='code/03_PathTracing.Rmd')
-
-#Set Used SynIDs For Provenance
-Syns_Used <- c( 'syn22863899', 'syn22863896')
-# Set annotations
-all.annotations = list(
-  dataType = 'Network',
-  summaryLevel = 'gene',
-  assay	 = 'RNAseq',
-  tissueTypeAbrv	= c('IFG', 'STG', 'FP', 'PHG', 'TCX', 'DLFPC'), 
-  study = c( 'MSBB', 'ROSMAP', 'Mayo' ), 
-  organism = 'HomoSapiens',
-  consortium	= 'TreatAD',
-  genomeAssemblyID = 'GRCh38'
-)
-
-#eg. IGRAPH c9e6a19 DN-- 486 13553 -- 
-Sub_Net <- induced_subgraph( sub_net, v=V(sub_net)[ names(V(sub_net)) %in% test ] )
-
-#eg. IGRAPH ff4b668 DN-- 486 6119 -- 
-Sub_Net_simple <- igraph::simplify(
-  Sub_Net,
-  remove.multiple = TRUE,
-  remove.loops = FALSE,
-  edge.attr.comb = list( interaction = "concat", 
-                         Occurance = "concat",
-                         UniqCol = "concat",
-                         pathway = "concat", 
-                         EdgeRep = "mean",
-                         Edge = "random",
-                         SumOccurence = "mean",
-                         DLPFC_CE = "mean",
-                         CBE_CE = "mean",
-                         FP_CE = "mean",
-                         IFG_CE = "mean",
-                         PHG_CE = "mean",
-                         STG_CE = "mean",
-                         TCX_CE = "mean",
-                         Avg_Cortex_CE = "mean",
-                         Avg_All_CE = "mean"
-                      )
-)
-
-
-igraph::write_graph( Sub_Net, "~/igraph_Network_Expansion/ADPD_Comb_V7.graphml", format = "graphml")
-ENRICH_OBJ <-  syn_temp$store( synapseclient$File( path='~/igraph_Network_Expansion/ADPD_Comb_V7.graphml', name = 'ADPD Network Version 7', parentId=CODE$properties$id ), used = Syns_Used, activityName = activityName, activityDescription = activityDescription)
-
-
-
-#######################################
-# Store  executed = thisFile,
-igraph::write_graph(sub_net, "~/igraph_Network_Expansion/ADPD_NoSentinel.graphml", format = "graphml")
-ENRICH_OBJ <-  syn_temp$store( synapseclient$File( path='~/igraph_Network_Expansion/ADPD_NoSentinel.graphml', name = 'ADPD Network WithOut Sentinel Genes', parentId=CODE$properties$id ), used = Syns_Used, activityName = activityName, activityDescription = activityDescription)
-
-igraph::write_graph(subSent_net, "~/igraph_Network_Expansion/ADPD_Direct_To_Sentinel.graphml", format = "graphml")
-ENRICH_OBJ <-  syn_temp$store( synapseclient$File( path='~/igraph_Network_Expansion/ADPD_Direct_To_Sentinel.graphml', name = 'ADPD Traced Directly To Sentinel Genes', parentId=CODE$properties$id ), used = Syns_Used, activityName = activityName, activityDescription = activityDescription)
-
-
-
-igraph::write_graph( subMerge_net, "~/igraph_Network_Expansion/ADPD_Sentinel_Merge.graphml", format = "graphml")
-ENRICH_OBJ <-  syn_temp$store( synapseclient$File( path='~/igraph_Network_Expansion/ADPD_Sentinel_Merge.graphml', name = 'Core is ADPD pairwise mapped overlapped with Sential to ADPD overlapped', parentId=CODE$properties$id ), used = Syns_Used, activityName = activityName, activityDescription = activityDescription)
-
-```
-
-
-
-
-
-
-```{r pathTraceSentinel, eval=F }
-#Load Input Gene List:
-Sentinal <- ListLoad( '~/igraph_Network_Expansion/InputList/AD_Sentinel_List.txt', net )
-
-SentPath <- unlist( lapply( Genes, Short_Paths, Net=net, targets=Genes, sentinals=Sentinal ) )
-SentPath <- SentPath[ !duplicated(SentPath) ]
-
-#_Annotate the Network with the core
-SentNet <- net
-SentNet <- set_vertex_attr( net, "Core", value = 'No' )
-SentNet <- set_vertex_attr( SentNet, "Core", index = V(SentNet)[ names(V(SentNet)) %in% SentPath ], value = 'Yes' )
-
-SentExpand <- list( One = Grow_Net( net, 1, SentPath ),
-                Two = Grow_Net( net, 2, SentPath ),
-                Three = Grow_Net( net, 3, SentPath ),
-                Four = Grow_Net( net, 4, SentPath ),
-                Five = Grow_Net( net, 5, SentPath )
-              )
-
-Sentlengths <- unlist( lapply( SentExpand, length ) ) 
-
-# cut the list object if it maxes out
-if( as.numeric(table(max(Sentlengths) %in% Sentlengths)[TRUE]) > 1 ){
-  Inds <- which( Sentlengths == max(Sentlengths) )
-  SentExpand <- SentExpand[ 1:min(Inds) ]
-}
-
-#Unique_Expanded_Levels
-for( i in length(SentExpand):2 ){
-  SentExpand[[i]] <- SentExpand[[i]][ ( SentExpand[[i]] %in% SentExpand[[i-1]] )==F ]
-}
-SentExpand[[1]] <- SentExpand[[1]][ ( SentExpand[[1]] %in% names(V(SentNet)[ names(V(SentNet)) %in% SentPath ]) )==F ]
-
-#Filter total net for relevant genes
-SentTotal_Genes <- c( names(V(SentNet)[ names(V(SentNet)) %in% SentPath ]), unlist(SentExpand) )
-subSent_net <- induced_subgraph( SentNet, v=V(SentNet)[ names(V(SentNet)) %in% SentTotal_Genes ] )
-
-#Annotate Verticies with Expanded Desiganation
-subSent_net <- set_vertex_attr( subSent_net, "Expanded", value = 'NA' )
-subSent_net <- set_vertex_attr( subSent_net, "Core", index = V(subSent_net)[ names(V(subSent_net)) %in% SentPath ], value = 0 ) 
-
-for( i in 1:length(SentExpand) ){
-  subSent_net <- set_vertex_attr( subSent_net, "Core", index = V(subSent_net)[ names(V(subSent_net)) %in% SentExpand[[i]] ], value = i ) 
-
-}
-
-```
-
-```{r pathTraceCombine, eval=F }
-Merged_Genes <- SentPath[ SentPath %in% test ]
-
-#_Annotate the Network with the core
-MergeNet <- net
-MergeNet <- set_vertex_attr( net, "Core", value = 'No' )
-MergeNet <- set_vertex_attr( net, "Core", index = V(MergeNet)[ names(V(MergeNet)) %in% Merged_Genes ], value = 'Yes' )
-
-SentExpand <- list( One = Grow_Net( net, 1, Merged_Genes ),
-                Two = Grow_Net( net, 2, Merged_Genes ),
-                Three = Grow_Net( net, 3, Merged_Genes ),
-                Four = Grow_Net( net, 4, Merged_Genes ),
-                Five = Grow_Net( net, 5, Merged_Genes )
-              )
-
-Sentlengths <- unlist( lapply( SentExpand, length ) ) 
-
-# cut the list object if it maxes out
-if( as.numeric(table(max(Sentlengths) %in% Sentlengths)[TRUE]) > 1 ){
-  Inds <- which( Sentlengths == max(Sentlengths) )
-  SentExpand <- SentExpand[ 1:min(Inds) ]
-}
-
-#Unique_Expanded_Levels
-for( i in length(SentExpand):2 ){
-  SentExpand[[i]] <- SentExpand[[i]][ ( SentExpand[[i]] %in% SentExpand[[i-1]] )==F ]
-}
-SentExpand[[1]] <- SentExpand[[1]][ ( SentExpand[[1]] %in% names(V(MergeNet)[ names(V(MergeNet)) %in% Merged_Genes ]) )==F ]
-
-#Filter total net for relevant genes
-MergeTotal_Genes <- c( names(V(MergeNet)[ names(V(MergeNet)) %in% Merged_Genes ]), unlist(SentExpand) )
-subMerge_net <- induced_subgraph( MergeNet, v=V(MergeNet)[ names(V(MergeNet)) %in% MergeTotal_Genes ] )
-
-#Annotate Verticies with Expanded Desiganation
-subMerge_net <- set_vertex_attr( subMerge_net, "Expanded", value = 'NA' )
-subMerge_net <- set_vertex_attr( subMerge_net, "Core", index = V(subMerge_net)[ names(V(subMerge_net)) %in% MergeTotal_Genes ], value = 0 ) 
-
-for( i in 1:length(SentExpand) ){
-  subMerge_net <- set_vertex_attr( subMerge_net, "Core", index = V(subMerge_net)[ names(V(subMerge_net)) %in% SentExpand[[i]] ], value = i ) 
-
-}
-
-```

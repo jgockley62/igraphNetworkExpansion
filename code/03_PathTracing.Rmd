@@ -327,10 +327,15 @@ path_obj_filter <- function( path_obj, vertices, lim, path_name, weights ) {
     #Paths Kept - ISSUE Here
     message(paste0(
       sum(filter_summary$Passed),
-      " target paths out of ",
+      " ",
+      path_name,
+      " paths out of ",
       length(path_obj$res), 
       " ( ",
-      signif(sum(filter_summary$Passed) / length(path_obj$res), 4) * 100,
+      signif(
+        sum(filter_summary$Passed) / length(path_obj$res),
+        4
+      ) * 100,
       "% ) kept"
     ))
       
@@ -339,7 +344,13 @@ path_obj_filter <- function( path_obj, vertices, lim, path_name, weights ) {
       length(all_vertices) - length(vertices),
       ' of ',
       length(all_vertices),
-      ' target genes ( ', signif((length(all_vertices) - length(vertices))/length(all_vertices), 4) * 100,
+      ' ', 
+      path_name,
+      ' genes ( ', 
+      signif(
+        (length(all_vertices) - length(vertices)) / length(all_vertices), 
+        4
+        ) * 100,
       '% ) filtered out'
     ))
   }

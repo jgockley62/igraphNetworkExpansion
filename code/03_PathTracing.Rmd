@@ -365,6 +365,12 @@ path_obj_filter <- function( path_obj, vertices, lim, path_name, weights ) {
 #' @param weights OMICS/vertex scores as named vector
 find_limit <- function ( s_path, t_path, weights) {
   #if there are no sentinel paths return empty and look at target
+  if(length(s_path$res)==0) {
+    s_path$res <- 1
+  }
+  if(length(t_path$res)==0) {
+    t_path$res <- 1
+  }
   if ((length(s_path$res) == 1) & (length(s_path$res[[1]]) == 1)) {
     sent_keep_vertices <- NA
     
@@ -739,6 +745,7 @@ for (i in 1:length(leading_edge)){
 B <- Sys.time()-time
 
 ```
+
 ```{r pairwise_run}
 
 ##### All Go Terms
@@ -784,7 +791,7 @@ for (sent in 1:length(all_goterms)){
     net_filename=all_goterms[[sent]][2], net_synname=all_goterms[[sent]][3],
     p_id = 'syn25190666', folder = 'All Go Term Pairwise Networks',
     act_name = 'Pathway Tracing Network', 
-    act_desc = 'Simple Wthin Biodomain Tracing',
+    act_desc = 'Pariwise Biodomain Tracing',
     code = NULL, 
     repo = NULL,
     prov_object = prov,
@@ -793,52 +800,92 @@ for (sent in 1:length(all_goterms)){
   ) 
 
 }
-
 A <- Sys.time()-time
 
+## Push Leading Edge Combined to Synapse
+store_net(
+    network = net,
+    net_filename='All_GoTerm_Combined_Network', net_synname='All Go Term Combined Network',
+    p_id = 'syn25190666', folder = 'Megerded Pairwise Networks',
+    act_name = 'Pathway Tracing Network', 
+    act_desc = 'Combinded Pariwise Biodomain Tracing',
+    code = NULL, 
+    repo = NULL,
+    prov_object = prov,
+    syn_used = do.call(rbind, all_goterms)[,1], 
+    subset = all_genes[!duplicated(all_genes)]
+  ) 
+all_genes_wDups <- all_genes
+all_genes_Uniq <- all_genes[!duplicated(all_genes)]
+
+#Run Leading Edge Analysis
 time<-Sys.time()
 
 leading_genes <- list()
 leading_subnest <- list()
-##### Leading Edge
+alllead_genes <- NULL
 for (sent in 1:length(leading_edge)){
+  
+  g_list <- NULL
   for (target in 1:length(leading_edge)){
-  ### Load Lists:
-  genes <- list_load( leading_edge[[i]][1], net, is_syn = TRUE )
-  sentinal <-  list_load( leading_edge[[sent]][1], net, is_syn = TRUE )
+    if (sent==target){
+      
+    }else{
+      ### Load Lists:
+      genes <- list_load( leading_edge[[target]][1], net, is_syn = TRUE )
+      sentinal <-  list_load( leading_edge[[sent]][1], net, is_syn = TRUE )
+      
+      ### Run a Trace
+      trace <- lapply(genes, short_paths, tnet=net, targets=genes, sentinals=sentinal)
+    
+      ### Filter the trace
+      g_list <- c(g_list, trace_filter(trace))
+    }
+  }
   
-  ### Run a Trace
-  trace <- lapply( genes, short_paths, tnet=net, targets=genes, sentinals=sentinal  )
-  
-  ### Filter the trace
-  g_list <- trace_filter(trace)
-  
-  #Sink_of_List_method <- g_list
-  #length(g_list)
-  # 449
-  
+  g_list <- g_list[!duplicated(g_list)]
   
   #store the genelists and subnets
-  leading_genes[[leading_edge[[i]][2]]] <- g_list
-  leading_subnest[[leading_edge[[i]][2]]] <- induced_subgraph(
+  leading_genes[[leading_edge[[sent]][2]]] <- g_list
+  leading_subnest[[leading_edge[[sent]][2]]] <- induced_subgraph(
     net,
     v=V(net)[names(V(net)) %in% g_list]
   )
   
+  alllead_genes <- c(alllead_genes, g_list)
+  
   ### Store the Trace
   store_net(
     network = net,
-    net_filename=leading_edge[[i]][2], net_synname=leading_edge[[i]][3],
-    p_id = 'syn25190666', folder = 'Leading Edge',
+    net_filename=leading_edge[[sent]][2], net_synname=leading_edge[[sent]][3],
+    p_id = 'syn25190666', folder = 'Leading Term Pairwise Networks',
     act_name = 'Pathway Tracing Network', 
-    act_desc = 'Simple Wthin Biodomain Tracing',
+    act_desc = 'Pariwise Biodomain Tracing',
     code = NULL, 
     repo = NULL,
     prov_object = prov,
-    syn_used = leading_edge[[i]][1], 
+    syn_used = leading_edge[[sent]][1], 
     subset = g_list
   ) 
+
 }
 B <- Sys.time()-time
+
+## Push Leading Edge Combined to Synapse
+store_net(
+    network = net,
+    net_filename='All_LeadingEdge_Combined_Network', net_synname='All Leading Edge Combined Network',
+    p_id = 'syn25190666', folder = 'Megerded Pairwise Networks',
+    act_name = 'Pathway Tracing Network', 
+    act_desc = 'Combinded Pariwise Biodomain Tracing',
+    code = NULL, 
+    repo = NULL,
+    prov_object = prov,
+    syn_used = do.call(rbind, leading_edge)[,1], 
+    subset = alllead_genes[!duplicated(alllead_genes)]
+  ) 
+alllead_genes_wDups <- alllead_genes
+alllead_genes_Uniq <- alllead_genes[!duplicated(alllead_genes)]
+
 ```
 

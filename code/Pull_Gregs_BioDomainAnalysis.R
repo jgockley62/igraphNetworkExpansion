@@ -48,6 +48,9 @@ biodomain_translator <- function (proc, term) {
 # Mapping of GoTerms to Biodomain
 table(sapply(sig_terms, biodomain_enumerator, proc=genes))
 
+# All GoTerms for domains
+table(sapply(processes$pathway, biodomain_enumerator, proc=genes))
+
 # DF of GoTerm to Biodomains
 translator <- as.data.frame(
   do.call(
@@ -56,10 +59,18 @@ translator <- as.data.frame(
   )
 )
 
+# DF of GoTerm to Biodomains
+translator_All <- as.data.frame(
+  do.call(
+    rbind,
+    sapply(processes$pathway, biodomain_translator, proc=genes)
+  )
+)
 leadingedge_genes <- list()
 all_genes <- list()
 
 biodomains <- names(table(translator$biods))
+biodomains_All <- names(table(translator_All$biods))
 
 ######################################################################
 ## All genes in GoTerms
@@ -106,6 +117,48 @@ for(go in biodomains) {
   uniq_all[[go]] <- enns[!duplicated(enns)]
 }
 
+# Plot leading edge reccurence
+par(mfrow=c(4,4))
+for(go in biodomains) {
+  message(go)
+  hist(
+    table(
+      all_numerator(
+        genes,
+        translator,
+        go)
+    ),
+    main = go,
+    xlab='Gene Recurences')
+}
+
+# All GosxBiodomain
+all_biodomain <- as.list(biodomains_All)
+names(all_biodomain) <- biodomains_All
+for(go in biodomains_All) {
+  message(go)
+  enns <- all_numerator(
+    genes,
+    translator_All,
+    go
+  )
+  message(length(enns[!duplicated(enns)]))
+  all_biodomain[[go]] <- enns[!duplicated(enns)]
+}
+# Plot leading edge reccurence
+par(mfrow=c(4,4))
+for(go in biodomains_All) {
+  message(go)
+  hist(
+    table(
+      all_numerator(
+        genes,
+        translator_All,
+        go)
+    ),
+    main = go,
+    xlab='Gene Recurences')
+}
 ############################################
 ## Greg's leading edges
 
@@ -151,7 +204,21 @@ for(go in biodomains) {
   uniq_lead[[go]] <- enns[!duplicated(enns)]
 }
 
-######################################################################
+# Pull all genes for the complete BioDomains
+domain_lead <- as.list(biodomains)
+names(domain_lead) <- biodomains
+for(go in biodomains) {
+  message(go)
+  enns <- leadedge_numerator(
+    processes,
+    translator_All,
+    go
+  )
+  message(length(enns[!duplicated(enns)]))
+  domain_lead[[go]] <- enns[!duplicated(enns)]
+}
+
+################################################################################
 ## Pull Logsdon Scores
 
 ## Function to pull gene scores from the overall score table
@@ -165,6 +232,9 @@ names(pull_lead) <- biodomains
 
 pull_all <- as.list(biodomains)
 names(pull_all) <- biodomains
+
+pull_biodomain <- as.list(biodomains_All)
+names(pull_biodomain) <- biodomains_All
 
 for (bd in biodomains) { 
   #Leading Edge Genes
@@ -193,6 +263,19 @@ for (bd in biodomains) {
   df$logOverall <- log2(df$Overall)
   pull_all[[bd]] <- df
   
+  #Complete Biodomains
+  df <- read.csv(
+    syn_temp$tableQuery(
+      query = paste0(
+        'SELECT ENSG,GeneName,OmicsScore,Overall FROM syn24168007 WHERE ENSG IN (\'',
+        paste0( domain_lead[[bd]], collapse='\', \'' ),
+        '\')'),
+      resultsAs = 'csv')$filepath
+  )[, c('ENSG', 'GeneName', 'OmicsScore', 'Overall')]
+  df$logOmics <- log2(df$OmicsScore)
+  df$logOverall <- log2(df$Overall)
+  pull_biodomain[[bd]] <- df
+  
 }
 ######################################################################
 library(fitdistrplus)
@@ -209,6 +292,7 @@ all_scores <- read.csv(
 
 lapply( pull_lead,dim )
 lapply( pull_all,dim )
+lapply( pull_biodomain,dim )
 
 data <- pull_lead[[bd]]
 look_dist <- pull_lead[[bd]]$Overall
@@ -369,6 +453,14 @@ genelist_all <- sapply(
   Zstep = 0.5
 )  
 
+genelist_biodomain <- sapply(
+  biodomains, 
+  list_generator,
+  dat=pull_biodomain,
+  Max = 50,
+  Zstart=.5,
+  Zstep = 0.15
+)  
 
 for (i in 1:length(genelist_lead)) {
   lead <- as.numeric(
@@ -399,11 +491,73 @@ for (i in 1:length(genelist_lead)) {
   
 }
 
+
+### Comp the All Biodomains
+for (i in 1:length(genelist_lead)) {
+  lead <- as.numeric(
+    table(
+      genelist_biodomain[[i]] %in% genelist_all[[i]]
+    )['TRUE']
+  )
+  all <- as.numeric(
+    table(
+      genelist_all[[i]] %in% genelist_biodomain[[i]]
+    )['TRUE']
+  )
+  if (all == lead) {
+    message(paste0(
+      "For ",
+      biodomains[i],
+      ": Total Overlap = ",
+      all,
+      " Percent All = ",
+      all / length(genelist_all[[i]]),
+      " Percent Biodomain = ",
+      lead / length(genelist_biodomain[[i]])
+      
+    ))
+  }else{
+    warning(paste0( "Issue matching genes for: ", biodomains[i] ))
+  }
+  
+}
+
+for (i in 1:length(genelist_lead)) {
+  lead <- as.numeric(
+    table(
+      genelist_lead[[i]] %in% genelist_biodomain[[i]]
+    )['TRUE']
+  )
+  all <- as.numeric(
+    table(
+      genelist_biodomain[[i]] %in% genelist_lead[[i]]
+    )['TRUE']
+  )
+  if (all == lead) {
+    message(paste0(
+      "For ",
+      biodomains[i],
+      ": Total Overlap = ",
+      all,
+      " Percent Biodomain = ",
+      all / length(genelist_biodomain[[i]]),
+      " Percent Lead = ",
+      lead / length(genelist_lead[[i]])
+      
+    ))
+  }else{
+    warning(paste0( "Issue matching genes for: ", biodomains[i] ))
+  }
+  
+}
+
 #Write Lists to File: 
 ##test for destination paths:
 rec_paths <- c('InputList/BiodomainLists',
                'InputList/BiodomainLists/LeadingEdge',
-               'InputList/BiodomainLists/AllGoTerm')
+               'InputList/BiodomainLists/AllGoTerm',
+               'InputList/BiodomainLists/Biodomains',
+               'InputList/BiodomainLists/Biodomains_Total')
 for (path in rec_paths) {
   if (dir.exists(path)){
   }else{
@@ -424,6 +578,25 @@ for (bd in biodomains) {
   data.table::fwrite(
     as.list(genelist_lead[[bd]]),
     file = paste0( 'InputList/BiodomainLists/LeadingEdge/',
+                   gsub( ' ', '_',  bd),
+                   '.txt'
+    ),
+    quote = FALSE,
+    sep = '\n')
+}
+for (bd in biodomains) { 
+  data.table::fwrite(
+    as.list(genelist_biodomain[[bd]]),
+    file = paste0( 'InputList/BiodomainLists/Biodomains/',
+                   gsub( ' ', '_',  bd),
+                   '.txt'
+    ),
+    quote = FALSE,
+    sep = '\n')
+  
+  data.table::fwrite(
+    as.list(pull_biodomain[[bd]]$GeneName),
+    file = paste0( 'InputList/BiodomainLists/Biodomains_Total/',
                    gsub( ' ', '_',  bd),
                    '.txt'
     ),
@@ -489,6 +662,47 @@ for (fil_n in list.files('InputList/BiodomainLists/AllGoTerm/')) {
   enrich_obj <- syn_temp$store(
     synapseclient$File(
       path=paste0('InputList/BiodomainLists/AllGoTerm/',fil_n),
+      name = gsub(
+        '_', ' ', gsub('.txt',  '', fil_n)
+      ), parentId=code$properties$id ),
+    used = syns_used,
+    activityName = activity_name,
+    executed = this_file,
+    activityDescription = activity_description
+  )
+  syn_temp$setAnnotations(enrich_obj, annotations = all_annotations)
+} 
+
+
+#### Biodomain filtered list
+## Push All GoTerm
+code <- syn_temp$store(synapseclient$Folder(name = "Biodomain Filtered Genes",
+                                            parentId = parent_id))
+
+for (fil_n in list.files('InputList/BiodomainLists/Biodomains/')) {
+  enrich_obj <- syn_temp$store(
+    synapseclient$File(
+      path=paste0('InputList/BiodomainLists/Biodomains/',fil_n),
+      name = gsub(
+        '_', ' ', gsub('.txt',  '', fil_n)
+      ), parentId=code$properties$id ),
+    used = syns_used,
+    activityName = activity_name,
+    executed = this_file,
+    activityDescription = activity_description
+  )
+  syn_temp$setAnnotations(enrich_obj, annotations = all_annotations)
+} 
+
+## Push All GoTerm
+code <- syn_temp$store(synapseclient$Folder(name = "Biodomain All Genes By Domain",
+                                            parentId = parent_id))
+
+# Biodomain total list
+for (fil_n in list.files('InputList/BiodomainLists/Biodomains_Total/')) {
+  enrich_obj <- syn_temp$store(
+    synapseclient$File(
+      path=paste0('InputList/BiodomainLists/Biodomains_Total/',fil_n),
       name = gsub(
         '_', ' ', gsub('.txt',  '', fil_n)
       ), parentId=code$properties$id ),

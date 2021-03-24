@@ -804,8 +804,6 @@ for (i in 1:length(all_biodomain)) {
 C <- Sys.time()-time
 
 
-
-
 ```
 
 ```{r pairwise_run}
@@ -949,6 +947,76 @@ store_net(
 alllead_genes_wDups <- alllead_genes
 alllead_genes_Uniq <- alllead_genes[!duplicated(alllead_genes)]
 
+
+##### All BioDomain
+#Run Biodomain Analysis
+time<-Sys.time()
+
+biodomain_genes <- list()
+biodomain_subnest <- list()
+allbiodomain_genes <- NULL
+for (sent in 1:length(all_biodomain)){
+  
+  g_list <- NULL
+  for (target in 1:length(all_biodomain)){
+    if (sent==target){
+      
+    }else{
+      ### Load Lists:
+      genes <- list_load( all_biodomain[[target]][1], net, is_syn = TRUE )
+      sentinal <-  list_load( all_biodomain[[sent]][1], net, is_syn = TRUE )
+      
+      ### Run a Trace
+      trace <- lapply(genes, short_paths, tnet=net, targets=genes, sentinals=sentinal)
+    
+      ### Filter the trace
+      g_list <- c(g_list, trace_filter(trace))
+    }
+  }
+  
+  g_list <- g_list[!duplicated(g_list)]
+  
+  #store the genelists and subnets
+  biodomain_genes[[all_biodomain[[sent]][2]]] <- g_list
+  biodomain_subnest[[all_biodomain[[sent]][2]]] <- induced_subgraph(
+    net,
+    v=V(net)[names(V(net)) %in% g_list]
+  )
+  
+  allbiodomain_genes <- c(allbiodomain_genes, g_list)
+  
+  ### Store the Trace
+  store_net(
+    network = net,
+    net_filename=all_biodomain[[sent]][2], net_synname=all_biodomain[[sent]][3],
+    p_id = 'syn25190666', folder = 'Full Biodomain Pairwise Networks',
+    act_name = 'Pathway Tracing Network', 
+    act_desc = 'Pariwise Biodomain Tracing',
+    code = NULL, 
+    repo = NULL,
+    prov_object = prov,
+    syn_used = all_biodomain[[sent]][1], 
+    subset = g_list
+  ) 
+
+}
+C <- Sys.time()-time
+
+## Push Leading Edge Combined to Synapse
+store_net(
+    network = net,
+    net_filename='All_Biodomain_Combined_Network', net_synname='All Biodomain Combined Network',
+    p_id = 'syn25190666', folder = 'Megerded Pairwise Networks',
+    act_name = 'Pathway Tracing Network', 
+    act_desc = 'Combinded Pariwise Biodomain Tracing',
+    code = NULL, 
+    repo = NULL,
+    prov_object = prov,
+    syn_used = do.call(rbind, all_biodomain)[,1], 
+    subset = allbiodomain_genes[!duplicated(allbiodomain_genes)]
+  ) 
+allbiodomain_genes_wDups <- allbiodomain_genes
+allbiodomain_genes_Uniq <- allbiodomain_genes[!duplicated(allbiodomain_genes)]
 ```
 
 ```{r data_Explore}

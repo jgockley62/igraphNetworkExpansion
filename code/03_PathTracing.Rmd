@@ -653,6 +653,23 @@ leading_edge <- list(
   c('syn25185317', "Vascular_Function", "Vascular Function")
 )
 
+all_biodomain <- list(
+  c('syn25322503', "APP_Metabolism", "APP Metabolism"),
+  c('syn25322504', "Endolysosomal", "Endolysosomal"),
+  c('syn25322505', "Epigenetic_Regulation", "Epigenetic Regulation"),
+  c('syn25322506', "Immune_Response", "Immune Response"),
+  c('syn25322507', "Lipid_Metabolism", "Lipid Metabolism"),
+  c('syn25322508', "Mitochondria_Metabolism", "Mitochondria Metabolism"),
+  c('syn25322509', "Myelination", "Myelination"),
+  c('syn25322511', "Oxidative_Stress", "Oxidative Stress"),
+  c('syn25322514', "RNA_Spliceosome", "RNA Spliceosome"),
+  c('syn25322513', "Regulation_of_Apoptosis", "Regulation of Apoptosis"),
+  c('syn25322515', "Structural_Stabilization", "Structural Stabilization"),
+  c('syn25322516', "Synaptic_Dysfunction", "Synaptic Dysfunction"),
+  c('syn25322517', "Tau_Homeostasis", "Tau Homeostasis"),
+  c('syn25322518', "Vascular_Function", "Vascular Function")
+)
+
 this_repo <- githubr::getRepo(repository = 'jgockley62/igraph_Network_Expansion', ref="branch", refName='master')
 prov <- githubr::getPermlink(repository = this_repo, repositoryPath = 'code/03_PathTracing.Rmd')
       
@@ -743,6 +760,51 @@ for (i in 1:length(leading_edge)){
   ) 
 }
 B <- Sys.time()-time
+
+###
+##### All BioDomain Lists
+## - Run the whole list
+time<-Sys.time()
+
+allbiodomain_gene <- list()
+allbiodomain_subnet <- list()
+for (i in 1:length(all_biodomain)) {
+  ### Load Lists:
+  genes <- list_load( all_biodomain[[i]][1], net, is_syn = TRUE )
+  sentinal <-  list_load( all_biodomain[[i]][1], net, is_syn = TRUE )
+  
+  ### Run a Trace
+  trace <- lapply(genes, short_paths, tnet=net, targets=genes, sentinals=sentinal)
+
+  ### Filter the trace
+  g_list <- trace_filter(trace)
+  
+  #store the genelists and subnets
+  allbiodomain_gene[[all_biodomain[[i]][2]]] <- g_list
+  allbiodomain_subnet[[all_biodomain[[i]][2]]] <- induced_subgraph(
+    net,
+    v=V(net)[names(V(net)) %in% g_list]
+  )
+  
+  ### Store the Trace
+  store_net(
+    network = net,
+    net_filename=all_biodomain[[i]][2], net_synname=all_biodomain[[i]][3],
+    p_id = 'syn25190666', folder = 'All Biodomain',
+    act_name = 'Pathway Tracing Network', 
+    act_desc = 'Simple Wthin Biodomain Tracing',
+    code = NULL, 
+    repo = NULL,
+    prov_object = prov,
+    syn_used = all_biodomain[[i]][1], 
+    subset = g_list
+  ) 
+}
+
+C <- Sys.time()-time
+
+
+
 
 ```
 
@@ -889,3 +951,391 @@ alllead_genes_Uniq <- alllead_genes[!duplicated(alllead_genes)]
 
 ```
 
+```{r data_Explore}
+par(mfrow=c(2,1))
+hist(
+  table(all_genes_wDups),
+  las = 1,
+  xlab = "Gene Occurance",
+  main = "Frequency of All Go Term Genes in Merged Networks"
+)
+hist(
+  table(alllead_genes_wDups), 
+  las = 1,
+  xlab="Gene Occurance",
+  main = "Frequency of Leading Terms Genes in Merged Networks"
+)
+
+## 2607 Genes
+total_genes <- c(alllead_genes_Uniq, all_genes_Uniq)
+total_genes <- total_genes[!duplicated(total_genes)]
+
+approach_a <- c( 
+  names(
+    table(alllead_genes)[table(alllead_genes)>1]
+  ),
+  names(
+    table(all_genes_wDups)[table(all_genes_wDups)>1]
+  )
+)
+approach_a <- names(table(approach_a)[table(approach_a)>1])
+induced_subgraph(
+    net,
+    v=V(net)[names(V(net)) %in% approach_a]
+)
+# 2020 Genes
+approach_b <- c( 
+  names(
+    table(alllead_genes)[table(alllead_genes)>5]
+  ),
+  names(
+    table(all_genes_wDups)[table(all_genes_wDups)>5]
+  )
+)
+approach_b <- approach_b[!duplicated(approach_b)]
+induced_subgraph(
+    net,
+    v=V(net)[names(V(net)) %in% approach_b]
+)
+
+ggvenn::ggvenn(
+  list(
+    A = approach_a,
+    B = approach_b
+  ), 
+  fill_color = c("#0073C2FF", "#EFC000FF"),
+  stroke_size = 0.5, set_name_size = 4
+)
+
+ggvenn::ggvenn(
+  list( 
+    AllGoTerm = all_genes_Uniq,
+    LeadingEdge = alllead_genes_Uniq
+  ), 
+  fill_color = c("#0073C2FF", "#EFC000FF"),
+  stroke_size = 0.5, set_name_size = 4
+)
+
+###############################################################################
+# Re-Load the  networks and calc meterics
+#' this Function Loads a network object from synapse
+#' 
+#' @param syn_id the networks synID
+#' @param form the format of the netwrok file eg. "graphml"
+network_load <- function (syn_id, form) {
+  import_net <- igraph::read_graph(
+    file = syn_temp$get(syn_id)$path,
+    format = form
+  )
+  return(import_net)
+}
+
+net_names <- c(
+  "APP_Metabolism",	
+  "Endolysosomal",	
+  "Epigenetic_Regulation",	
+  "Immune_Response",	
+  "Lipid_Metabolism",	
+  "Mitochondria_Metabolism",	
+  "Myelination",
+  "Oxidative_Stress",	
+  "RNA_Spliceosome",	
+  "Regulation_of_Apoptosis",	
+  "Structural_Stabilization",	
+  "Synaptic_Dysfunction",
+  "Tau_Homeostasis",
+  "Vascular_Function"
+)
+
+allgo_nets <- c(
+  'syn25282251',
+  'syn25282360',
+  'syn25282459',
+  'syn25282571',
+  'syn25282680',
+  'syn25282807',
+  'syn25282931',
+  'syn25283044',
+  'syn25283144',
+  'syn25283257',
+  'syn25283382',
+  'syn25283517',
+  'syn25283654',
+  'syn25283790'
+)
+
+names(allgo_nets) <- net_names
+
+allgo_gene <- list()
+allgo_subnet <- list()
+all_genes <- NULL
+
+for (pnet in names(allgo_nets)) {
+  allgo_subnet[[pnet]] <- network_load(
+    allgo_nets[[pnet]], 
+    "graphml"
+  )
+  allgo_gene[[pnet]] <- names(igraph::V(allgo_subnet[[pnet]]))
+  all_genes <- c(all_genes, allgo_gene[[pnet]]) 
+}
+
+all_genes_wDups <- all_genes
+all_genes_Uniq <- all_genes[!duplicated(all_genes)]
+
+### Leading Pull
+
+alllead_nets <- c(
+  'syn25285732',
+  'syn25285773',
+  'syn25285873',
+  'syn25285938',
+  'syn25285991',
+  'syn25286043',
+  'syn25286109',
+  'syn25286893',
+  'syn25288862',
+  'syn25290320',
+  'syn25290376',
+  'syn25290421',
+  'syn25290471',
+  'syn25290519'
+)
+names(alllead_nets) <- net_names
+
+leading_genes <- list()
+leading_subnest <- list()
+alllead_genes <- NULL
+
+
+for (pnet in names(alllead_nets)) {
+  leading_subnest[[pnet]] <- network_load(
+    alllead_nets[[pnet]], 
+    "graphml"
+  )
+  leading_genes[[pnet]] <- names(igraph::V(leading_subnest[[pnet]]))
+  alllead_genes <- c(alllead_genes,  leading_genes[[pnet]]) 
+}
+
+alllead_genes_wDups <- alllead_genes
+alllead_genes_Uniq <- alllead_genes[!duplicated(alllead_genes)]
+###############################################################################
+# Initial list :
+listInput1 <- allgo_gene
+
+names(listInput1)[13] <- 'Tau_Homeostasis'
+names(listInput1)[6] <- "Mitochondria_Metabolism"
+
+myList <- list()
+foo_List <- list(
+  listInput1[[1]],
+  listInput1[[2]],
+  listInput1[[3]],
+  listInput1[[4]],
+  listInput1[[5]],
+  listInput1[[6]],
+  listInput1[[7]],
+  listInput1[[8]],
+  listInput1[[9]],
+  listInput1[[10]],
+  listInput1[[11]],
+  listInput1[[12]],
+  listInput1[[13]],
+  listInput1[[14]]
+)
+names(foo_List) <- names(listInput1)[1:14]
+
+for(i in 1:length(names(foo_List))){
+  temp <- apply( combn(names(foo_List), m=i), 2, as.list)
+  for (p in 1:length(temp)){
+    myList[[length(myList)+1]] <- temp[[p]]
+  }
+}
+p1 = UpSetR::upset(
+  UpSetR::fromList(foo_List), 
+  order.by = "degree", 
+  keep.order = TRUE, 
+  empty.intersections = "on",
+  intersections = myList
+)
+
+######## Leading genes
+# Initial list :
+listInput2 <- alllead_genes
+
+names(listInput2)[13] <- 'Tau_Homeostasis'
+names(listInput2)[6] <- "Mitochondria_Metabolism"
+
+myList <- list()
+foo_List <- list(
+  listInput2[[1]],
+  listInput2[[2]],
+  listInput2[[3]],
+  listInput2[[4]],
+  listInput2[[5]],
+  listInput2[[6]],
+  listInput2[[7]],
+  listInput2[[8]],
+  listInput2[[9]],
+  listInput2[[10]],
+  listInput2[[11]],
+  listInput2[[12]],
+  listInput2[[13]],
+  listInput2[[14]]
+)
+names(foo_List) <- names(listInput2)[1:14]
+
+for(i in 1:length(names(foo_List))){
+  temp <- apply( combn(names(foo_List), m=i), 2, as.list)
+  for (p in 1:length(temp)){
+    myList[[length(myList)+1]] <- temp[[p]]
+  }
+}
+p2 = UpSetR::upset(
+  UpSetR::fromList(foo_List), 
+  order.by = "degree", 
+  keep.order = TRUE, 
+  empty.intersections = "on",
+  intersections = myList
+)
+
+
+
+
+################################ Garbage
+intersections = list(
+  list("one"),
+  list("two"),
+  list("three"),
+  list("four"),
+  list("one", "two"),
+  list("one", "three"),
+  list("one", "four"),
+  list("two", "four"),
+  list("two", "three"),
+  list("three", "four")
+)
+
+listInput1<-allgo_gene
+p1 = UpSetR::upset(
+  UpSetR::fromList(listInput1), 
+  order.by = "degree", 
+  keep.order = TRUE, 
+  empty.intersections = "on",
+  intersections = list(
+  apply( combn(names(listInput1), m=1), 2, as.list),
+  apply( combn(names(listInput1), m=2), 2, as.list),
+  apply( combn(names(listInput1), m=3), 2, as.list),
+  apply( combn(names(listInput1), m=4), 2, as.list),
+  apply( combn(names(listInput1), m=5), 2, as.list),
+  apply( combn(names(listInput1), m=6), 2, as.list),
+  apply( combn(names(listInput1), m=7), 2, as.list),
+  apply( combn(names(listInput1), m=8), 2, as.list),
+  apply( combn(names(listInput1), m=9), 2, as.list),
+  apply( combn(names(listInput1), m=10), 2, as.list),
+  apply( combn(names(listInput1), m=11), 2, as.list),
+  apply( combn(names(listInput1), m=12), 2, as.list),
+  apply( combn(names(listInput1), m=13), 2, as.list),
+  apply( combn(names(listInput1), m=14), 2, as.list)
+  )
+  )
+p2 = upset(fromList(listInput2), 
+           order.by = "degree", 
+           keep.order = TRUE, 
+           empty.intersections = "on",
+           intersections = list(list("one", "two"), 
+                                list("one"), 
+                                list("two"), 
+                                list("one", "three"), 
+                                list("one", "four"), 
+                                list("one", "two", "three"), 
+                                list("one", "two", "four"), 
+                                list("one", "two", "three", "four"), 
+                                list("two", "three", "four"), 
+                                list("one", "three", "four"), 
+                                list("two", "three"), 
+                                list("two", "four"), 
+                                list("four"), 
+                                list("three"), 
+                                list("three", "four")
+                                )
+)
+  
+  
+
+
+
+
+
+
+
+
+gene_rows <- c(
+  names(table(all_genes)),
+  names(table(alllead_genes))
+)
+gene_rows <- gene_rows[!duplicated(gene_rows)]
+
+occurance <- as.data.frame(matrix(0, length(gene_rows), 2))
+row.names(occurance) <- gene_rows
+colnames(occurance) <- c("AllGoTerm", "LeadingEdge")
+
+occurance[names(table(all_genes)),]$AllGoTerm <- as.numeric(table(all_genes))
+occurance[names(table(alllead_genes)),]$LeadingEdge <- as.numeric(table(alllead_genes))
+
+UpSetR::upset(
+  as.matrix(occurance),
+  sets = c('AllGoTerm','LeadingEdge'),
+  sets.bar.color = "#56B4E9",
+  order.by = "freq",
+  empty.intersections = "on"
+)
+
+
+lt_input <- list( 
+  AllGoTerm = as.character(table(all_genes)),
+  LeadingEdge = as.character(table(alllead_genes))
+)
+us<-as.character(c(1:14))
+ComplexHeatmap::list_to_matrix(lt=lt_input, universal_set = us)
+
+lt_input <- list( 
+  AllGoTerm = all_genes,
+  LeadingEdge = alllead_genes
+)
+us = c(
+  all_genes,
+  alllead_genes
+)
+us <- us[!duplicated(us)]
+
+ComplexHeatmap::list_to_matrix(lt=lt_input, universal_set = us)
+universal_set = unique(unlist(lt))
+
+foo = lapply(lt_input, function(x) intersect(x, us))
+
+lt = list(a = sample(letters, 57, replace = T),
+          b = sample(letters, 10),
+          c = sample(letters, 57, replace = T))
+
+universal_set <- letters
+lt <- lt
+
+if (!is.null(universal_set)) {
+  lt = lapply(lt, function(x) intersect(x, universal_set))
+}else {
+  universal_set = unlist(lt)
+}
+mat = matrix(0, nrow = length(universal_set), ncol = length(lt))
+rownames(mat) = sort(universal_set)
+colnames(mat) = names(lt)
+for (i in seq_along(lt)) {
+  mat[as.character(unique(lt[[i]])), i] = mat[as.character(unique(lt[[i]])), i] + 1
+}
+   
+
+ComplexHeatmap::list_to_matrix(lt)
+ComplexHeatmap::list_to_matrix(lt, universal_set = letters)
+
+
+UpSetR::upset( data=occurance )
+```

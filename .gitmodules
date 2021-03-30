@@ -1,6 +1,3 @@
-[submodule "igraphhack"]
-	path = igraphhack
-	url = https://github.com/jevansbio/igraphhack.git
 [submodule "NetworkAnalysis"]
 	path = NetworkAnalysis
 	url = https://github.com/RUMgroup/NetworkAnalysis.git

@@ -7,7 +7,8 @@ Authors@R:
            role = c("aut", "cre"),
            email = "jake.gockley@sagebase.org",
            comment = c(ORCID = "0000-0001-7993-5308"))
-Description: 
+Description: This package was bulit to pathtrace network objects consisting of
+  protein-protein interactions and scored based on AD risk.
 License: MIT + file LICENSE
 URL: https://github.io/jgockley62/igraph_Network_Expansion,
     https://github.com/jgockley62/igraph_Network_Expansion

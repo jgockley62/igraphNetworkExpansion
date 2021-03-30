@@ -1,4 +1,4 @@
-Package: igraph_Network_Expansion
+Package: igraphNetworkyExpansion
 Title: Trace Subnetworks from an AD Necortical Network of Protein-Protein Interactions
 Version: 0.0.0.1000
 Authors@R: 

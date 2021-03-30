@@ -1,0 +1,69 @@
+Package: igraph_Network_Expansion
+Title: Trace Subnetworks from an AD Necortical Network of Protein-Protein Interactions
+Version: 0.0.0.1000
+Authors@R: 
+    person(given = "Jake",
+           family = "Gockley",
+           role = c("aut", "cre"),
+           email = "jake.gockley@sagebase.org",
+           comment = c(ORCID = "0000-0001-7993-5308"))
+Description: 
+License: MIT + file LICENSE
+URL: https://github.io/jgockley62/igraph_Network_Expansion,
+    https://github.com/jgockley62/igraph_Network_Expansion
+Encoding: UTF-8
+LazyData: true
+Suggests: 
+    testthat (>= 2.1.0)
+RoxygenNote: 7.1.1
+biocViews:
+Imports:
+	bcv,
+	BiocManager,
+	biomaRt,
+	clusterProfiler,
+	ComplexHeatmap,
+	corpcor,
+	cqn,
+	data.table,
+	doParallel,
+	DOSE,
+	dplyr,
+	edgeR,
+	foreach,
+	ggplot2,
+	ggrepel,
+	glmnet,
+	httr,
+	igraph,
+	kableExtra,
+	knitr,
+	limma,
+	optmatch,
+	org.Hs.eg.db,
+	parallel,
+	paxtoolsr,
+	pheatmap,
+	plotrix,
+	plyr,
+	RColorBrewer,
+	RCy3,
+	reshape,
+	reticulate,
+	Rglpk,
+	RJSONIO,
+	rmarkdown,
+	scater,
+	sva,
+	tidyr,
+	vbsr,
+	WGCNA
+Additional_repositories:
+    http://ran.synapse.org
+Remotes:
+	brian-bot/githubr
+	rlbarter/superheat
+	jhrcook/HotNetvieweR
+	blogsdon/spike/spike
+VignetteBuilder:
+    knitr

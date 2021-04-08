@@ -4,7 +4,7 @@
 \alias{list_load}
 \title{Loads a Gene List From Synapse}
 \usage{
-list_load(file_path, network, is_syn = FALSE)
+list_load(file_path, network, is_syn = FALSE, synap_import = NULL)
 }
 \arguments{
 \item{file_path}{the igraph network to push to synapse eg. net}
@@ -12,6 +12,9 @@ list_load(file_path, network, is_syn = FALSE)
 \item{network}{igraph network object to use to filter the vertices From}
 
 \item{is_syn}{is the list a synapse ID default=FALSE}
+
+\item{synap_import}{is the reticulated imported synapse from 
+log_into_synapse()$synapse default value is NULL}
 }
 \value{
 genes from the input present within the network
@@ -21,13 +24,27 @@ Loads a gene list. If is_syn is TRUE file_path is interperated as a synapse
 ID. Otherwise file_path is interperated as a file path.
 }
 \examples{
+invisible(slim_net)
 all_goterms <- list(
-   c('syn25185319', "APP_Metabolism", "APP Metabolism"),
-   c('syn25185320', "Endolysosomal", "Endolysosomal")
+   c(
+       'syn25185319', 
+       system.file(
+           "extdata/inputlists/", 
+           "APP_Metabolism.txt", 
+           package = "igraphNetworkExpansion"), 
+       "APP Metabolism"
+   ),
+  c(
+       'syn25185320', 
+       system.file(
+           "extdata/inputlists/", 
+           "Endolysosomal.txt", 
+           package = "igraphNetworkExpansion"), 
+       "Endolysosomal"
+   )
 )
 list_load(
-   all_goterms[[1]][1],
-   network=<USER SPECIFIED igraph Network>,
-   is_syn = TRUE
+   all_goterms[[1]][2],
+   network = slim_net
 )
 }

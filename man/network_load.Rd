@@ -4,12 +4,15 @@
 \alias{network_load}
 \title{Re-Load the  networks and calc meterics}
 \usage{
-network_load(syn_id, form)
+network_load(syn_id, form, synap_import)
 }
 \arguments{
 \item{syn_id}{the networks synID}
 
 \item{form}{the format of the netwrok file eg. "graphml"}
+
+\item{synap_import}{is the reticulated imported synapse from 
+log_into_synapse()$synapse}
 }
 \value{
 an igraph network object
@@ -19,5 +22,10 @@ This Function Loads a network object from synapse using its synapse ID and
 the type of network, ie graphml.
 }
 \examples{
-
+syn <- log_into_synapse()
+net_example <- network_load(
+     syn_id = 'syn23247263', 
+     form = 'graphml',
+     synap_import = syn$synapse
+)
 }

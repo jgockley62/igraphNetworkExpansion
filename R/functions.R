@@ -6,30 +6,32 @@
 #' @export
 #' @param usr A single value character vector of the users Synapse ID
 #' @param pass A single value character vector of the users Synapse Password
-#' @return Synapse login object from
+#' @return Synapse login object to use in list_load(), store_net(), and 
+#' network_load()
 #' @examples
 #' log_into_synapse()
 #' log_into_synapse(
-#'    usr = '<UserName>',
-#'    pass = '<UserPassword>'
+#'    usr = NULL,
+#'    pass = NULL
 #'  )
 #'  
+
 log_into_synapse <- function(usr=NULL, pass=NULL) {
   #install 
   reticulate::conda_create("r-reticulate")
   reticulate::conda_install( channel = 'bioconda', packages="synapseclient")
   synapseclient <- reticulate::import("synapseclient")
-  syn_temp <- synapseclient$Synapse()
-  if (usr==NULL & pass==NULL){
-    syn_temp$login( )
+  client_import <- synapseclient$Synapse()
+  if (is.null(usr) & is.null(pass)){
+    client_import$login( )
   }else{
-    if(usr==NULL | pass==NULL){
+    if(is.null(usr) | is.null(pass)){
       stop("Must Specify Both User ID and Password or 
            Leave Blank to use Synapse Credentials"
           )
     }else{
       eval(parse(text=paste0(
-        'syn_temp$login(\'',
+        'client_import$login(\'',
         usr,
         '\', \'',
         pass,
@@ -37,7 +39,7 @@ log_into_synapse <- function(usr=NULL, pass=NULL) {
       )))
     }
   }
-  
+  return(list(synapse=client_import,client=synapseclient))
 }
 
 #' Loads a Gene List From Synapse
@@ -49,24 +51,40 @@ log_into_synapse <- function(usr=NULL, pass=NULL) {
 #' @param file_path the igraph network to push to synapse eg. net
 #' @param network igraph network object to use to filter the vertices From
 #' @param is_syn is the list a synapse ID default=FALSE
+#' @param synap_import is the reticulated imported synapse from 
+#' log_into_synapse()$synapse default value is NULL
 #' @return genes from the input present within the network
 #' @examples 
+#' invisible(slim_net)
 #' all_goterms <- list(
-#'    c('syn25185319', "APP_Metabolism", "APP Metabolism"),
-#'    c('syn25185320', "Endolysosomal", "Endolysosomal")
+#'    c(
+#'        'syn25185319', 
+#'        system.file(
+#'            "extdata/inputlists/", 
+#'            "APP_Metabolism.txt", 
+#'            package = "igraphNetworkExpansion"), 
+#'        "APP Metabolism"
+#'    ),
+#'   c(
+#'        'syn25185320', 
+#'        system.file(
+#'            "extdata/inputlists/", 
+#'            "Endolysosomal.txt", 
+#'            package = "igraphNetworkExpansion"), 
+#'        "Endolysosomal"
+#'    )
 #' )
 #' list_load(
-#'    all_goterms[[1]][1],
-#'    network=<USER SPECIFIED igraph Network>,
-#'    is_syn = TRUE
+#'    all_goterms[[1]][2],
+#'    network = slim_net
 #' )
-list_load <- function (file_path, network, is_syn = FALSE) {
+list_load <- function (file_path, network, is_syn = FALSE, synap_import = NULL) {
   if (isTRUE(is_syn)) {
-    genes <- read.table(
-      file=syn_temp$get(file_path)$path, header=F, sep='\n', stringsAsFactors = F
+    genes <- utils::read.table(
+      file=synap_import$get(file_path)$path, header=F, sep='\n', stringsAsFactors = F
     )[,1]
   }else{
-    genes <- read.table(
+    genes <- utils::read.table(
       file=file_path,header=F, sep='\n', stringsAsFactors = F
     )[,1]
   }
@@ -440,12 +458,21 @@ find_limit <- function ( s_path, t_path, weights, cores=1) {
 #' @return List object of Inter genes from target path traces and Sentinal genes
 #' from sentinal gene traces
 #' @examples 
+#' invisible(slim_net)
+#' invisible(genelists)
 #' 
+#' example_path <- short_paths(
+#'     tnet = slim_net,
+#'     target = genelists$targets$APP_Metabolism[1],
+#'     targets = genelists$targets$APP_Metabolism,
+#'     sentinals = genelists$sentinals$Immune_Response,
+#'     cores = 1
+#' )
 short_paths <- function( tnet, target, targets, sentinals, cores = 1 ){
   
   message( paste0( 'Working on: ', target))
   # Pull paths that have median OMICS Score. ( Need to integrate a Genetics+Genomics Measure )
-  omics_scores <- setNames(igraph::V(tnet)$weight, igraph::V(tnet)$name)
+  omics_scores <- stats::setNames(igraph::V(tnet)$weight, igraph::V(tnet)$name)
   
   # All Shortest paths from target to Target Genes directed
   snet <- igraph::simplify(
@@ -546,7 +573,9 @@ trace_filter <- function (path_obj) {
 
 #' Push Network to Synapse
 #'
-#'This function takes a network object and pushes it to synapse
+#' This function takes a network object and pushes it to synapse. The provided 
+#' example will work assuming that you have edit privliges to the synapse ID
+#' used as the patent ID (p_id).
 #'
 #' @export
 #' @param network the igraph network to push to synapse eg. net
@@ -566,16 +595,34 @@ trace_filter <- function (path_obj) {
 #' eg. test
 #' @param prov_object A pre made github code provenance object or vector of 
 #' objects
+#' @param synap_import  is the reticulated imported synapse from 
+#' log_into_synapse()$synapse
+#' @param client_import is the reticulated imported synapseclient client
+#' log_into_synapse()$client
 #' @return a synapse entity of a .graphml subnetwork object stored in synapse
 #' @examples 
+#' invisible(slim_net)
+#' syn <- log_into_synapse()
 #' 
+#' store_net(
+#'     network  = slim_net , 
+#'     net_filename = "test_netpush", 
+#'     net_synname = "test_netpush_network",
+#'     p_id = "syn25467038", 
+#'     folder = "test_push",
+#'     act_name = "This is a test push network",
+#'     act_desc = "This network was puched here to test the store_net function",
+#'     synap_import = syn$synapse, 
+#'     client_import = syn$client
+#' ) 
 store_net <- function (network, net_filename, net_synname,
-                       p_id, folder, act_name, act_desc,
+                       p_id, folder, act_name, act_desc, 
+                       synap_import, client_import,
                        code=NULL, repo=NULL,
                        syn_used=NULL, subset=NULL,
                        prov_object = NULL) {
   #Set Activity
-  activity <- syn_temp$store(synapseclient$Folder(
+  activity <- synap_import$store(client_import$Folder(
     name = folder, 
     parentId = p_id
   ))
@@ -644,13 +691,13 @@ store_net <- function (network, net_filename, net_synname,
   # write file
   igraph::write_graph(
     network,
-    paste0( '~/igraph_Network_Expansion/', net_filename,'.graphml'),
+    paste0( net_filename,'.graphml'),
     format = "graphml"
   )
   # push file
-  enrich_obj <-  syn_temp$store(
-    synapseclient$File(
-      path=paste0( '~/igraph_Network_Expansion/', net_filename,'.graphml'),
+  enrich_obj <-  synap_import$store(
+    client_import$File(
+      path=paste0( net_filename,'.graphml'),
       name = net_synname,
       parentId=activity$properties$id ),
     used = syn_used,
@@ -669,12 +716,19 @@ store_net <- function (network, net_filename, net_synname,
 #' @export
 #' @param syn_id the networks synID
 #' @param form the format of the netwrok file eg. "graphml"
+#' @param synap_import  is the reticulated imported synapse from 
+#' log_into_synapse()$synapse
 #' @return an igraph network object
 #' @examples 
-#' 
-network_load <- function (syn_id, form) {
+#' syn <- log_into_synapse()
+#' net_example <- network_load(
+#'      syn_id = 'syn23247263', 
+#'      form = 'graphml',
+#'      synap_import = syn$synapse
+#' )
+network_load <- function (syn_id, form, synap_import) {
   import_net <- igraph::read_graph(
-    file = syn_temp$get(syn_id)$path,
+    file = synap_import$get(syn_id)$path,
     format = form
   )
   return(import_net)

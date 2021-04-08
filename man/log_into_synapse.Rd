@@ -12,7 +12,8 @@ log_into_synapse(usr = NULL, pass = NULL)
 \item{pass}{A single value character vector of the users Synapse Password}
 }
 \value{
-Synapse login object from
+Synapse login object to use in list_load(), store_net(), and 
+network_load()
 }
 \description{
 Log into Synapse. Assumes credentials are stored.
@@ -22,8 +23,8 @@ usr and pass respectivly
 \examples{
 log_into_synapse()
 log_into_synapse(
-   usr = '<UserName>',
-   pass = '<UserPassword>'
+   usr = NULL,
+   pass = NULL
  )
  
 }

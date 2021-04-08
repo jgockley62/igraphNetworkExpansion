@@ -7,7 +7,7 @@
 Code provided from: jevansbio/igraphhack
 Git User: jevansbio}
 \usage{
-plot.igraph2(
+\method{plot}{igraph2}(
   x,
   axes = FALSE,
   add = FALSE,
@@ -15,11 +15,52 @@ plot.igraph2(
   ylim = c(-1, 1),
   mark.groups = list(),
   mark.shape = 1/2,
-  mark.col = rainbow(length(mark.groups), alpha = 0.3),
-  mark.border = rainbow(length(mark.groups), alpha = 1),
+  mark.col = grDevices::rainbow(length(mark.groups), alpha = 0.3),
+  mark.border = grDevices::rainbow(length(mark.groups), alpha = 1),
   mark.expand = 15,
   ...
 )
+}
+\arguments{
+\item{x}{The graph to plot.}
+
+\item{axes}{Logical, whether to plot axes, defaults to FALSE.}
+
+\item{add}{Logical scalar, whether to add the plot to the current device, or
+delete the device's current contents first.}
+
+\item{xlim}{The limits for the horizontal axis, it is unlikely that you want
+to modify this.}
+
+\item{ylim}{The limits for the vertical axis, it is unlikely that you want
+to modify this.}
+
+\item{mark.groups}{A list of vertex id vectors. It is interpreted as a set
+of vertex groups. Each vertex group is highlighted, by plotting a colored
+smoothed polygon around and \dQuote{under} it. See the arguments below to
+control the look of the polygons.}
+
+\item{mark.shape}{A numeric scalar or vector. Controls the smoothness of the
+vertex group marking polygons. This is basically the \sQuote{shape}
+parameter of the \code{\link[graphics]{xspline}} function, its possible
+values are between -1 and 1. If it is a vector, then a different value is
+used for the different vertex groups.}
+
+\item{mark.col}{A scalar or vector giving the colors of marking the
+polygons, in any format accepted by \code{\link[graphics]{xspline}}; e.g.
+numeric color ids, symbolic color names, or colors in RGB.}
+
+\item{mark.border}{A scalar or vector giving the colors of the borders of
+the vertex group marking polygons. If it is \code{NA}, then no border is
+drawn.}
+
+\item{mark.expand}{A numeric scalar or vector, the size of the border around
+the marked vertex groups. It is in the same units as the vertex sizes. If a
+vector is given, then different values are used for the different vertex
+groups.}
+
+\item{...}{Additional plotting parameters. See \link[igraph]{igraph.plotting} for
+the complete list.}
 }
 \description{
 Modified igraph plotting code to allow for changes in edge.arrow.width.

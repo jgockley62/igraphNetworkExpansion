@@ -1,19 +1,49 @@
+i.parse.plot.params <- utils::getFromNamespace(
+  "i.parse.plot.params",
+  "igraph"
+)
+igraph.check.shapes <- utils::getFromNamespace(
+  "igraph.check.shapes",
+  "igraph"
+)
+i.get.arrow.mode <- utils::getFromNamespace(
+  "i.get.arrow.mode",
+  "igraph"
+)
+#' @importFrom graphics xspline
+igraph.polygon <- utils::getFromNamespace(
+  "igraph.polygon",
+  "igraph"
+)
+.igraph.shapes <- utils::getFromNamespace(
+  ".igraph.shapes",
+  "igraph"
+)
+
+#' @importFrom graphics par xyinch segments xspline lines polygon
+igraph.Arrows <- utils::getFromNamespace(
+"igraph.Arrows",
+"igraph"
+)
+
 #' Modified igraph plotting code to allow for changes in edge.arrow.width.
 #'    Edge.arrow.size still not supported
 #' Code provided from: jevansbio/igraphhack
 #' Git User: jevansbio
-plot.igraph2 = function (
+#' @inheritParams igraph::plot.igraph
+#' @export
+plot.igraph2 <- function (
   x,
   axes = FALSE, add = FALSE,
   xlim = c(-1, 1), ylim = c(-1, 1), 
   mark.groups = list(), mark.shape = 1/2,
-  mark.col = rainbow(length(mark.groups), alpha = 0.3), 
-  mark.border = rainbow(length(mark.groups), 
+  mark.col = grDevices::rainbow(length(mark.groups), alpha = 0.3), 
+  mark.border = grDevices::rainbow(length(mark.groups), 
   alpha = 1), mark.expand = 15, 
   ...) 
 {
   graph <- x
-  if (!is_igraph(graph)) {
+  if (!igraph::is_igraph(graph)) {
     stop("Not a graph object")
   }
   params <- i.parse.plot.params(graph, list(...))
@@ -62,14 +92,14 @@ plot.igraph2 = function (
   arrow.mode <- i.get.arrow.mode(graph, arrow.mode)
   maxv <- max(vertex.size)
   if (rescale) {
-    layout <- norm_coords(layout, -1, 1, -1, 1)
+    layout <- igraph::norm_coords(layout, -1, 1, -1, 1)
     xlim <- c(xlim[1] - margin[2] - maxv, xlim[2] + margin[4] + 
                 maxv)
     ylim <- c(ylim[1] - margin[1] - maxv, ylim[2] + margin[3] + 
                 maxv)
   }
   if (!add) {
-    plot(0, 0, type = "n", xlab = xlab, ylab = ylab, xlim = xlim, 
+    graphics::plot(0, 0, type = "n", xlab = xlab, ylab = ylab, xlim = xlim, 
          ylim = ylim, axes = axes, frame = frame, asp = asp, 
          main = main, sub = sub)
   }
@@ -81,18 +111,18 @@ plot.igraph2 = function (
   mark.col <- rep(mark.col, length = length(mark.groups))
   mark.expand <- rep(mark.expand, length = length(mark.groups))
   for (g in seq_along(mark.groups)) {
-    v <- V(graph)[mark.groups[[g]]]
+    v <- igraph::V(graph)[mark.groups[[g]]]
     if (length(vertex.size) == 1) {
       vs <- vertex.size
     }
     else {
-      vs <- rep(vertex.size, length = vcount(graph))[v]
+      vs <- rep(vertex.size, length = igraph::vcount(graph))[v]
     }
     igraph.polygon(layout[v, , drop = FALSE], vertex.size = vs, 
                    expand.by = mark.expand[g]/200, shape = mark.shape[g], 
                    col = mark.col[g], border = mark.border[g])
   }
-  el <- as_edgelist(graph, names = FALSE)
+  el <- igraph::as_edgelist(graph, names = FALSE)
   loops.e <- which(el[, 1] == el[, 2])
   nonloops.e <- which(el[, 1] != el[, 2])
   loops.v <- el[, 1][loops.e]
@@ -127,7 +157,7 @@ plot.igraph2 = function (
                                           params = params, end = "both")
   }
   else {
-    shape <- rep(shape, length = vcount(graph))
+    shape <- rep(shape, length = igraph::vcount(graph))
     ec <- edge.coords
     ec[, 1:2] <- t(sapply(seq(
       length = nrow(el)), function(x) {
@@ -174,7 +204,7 @@ plot.igraph2 = function (
     plot.bezier <- function(cp, points, color, width, arr, 
                             lty, arrow.size, arr.w) {
       p <- compute.bezier(cp, points)
-      polygon(p[1, ], p[2, ], border = color, lwd = width, 
+      graphics::polygon(p[1, ], p[2, ], border = color, lwd = width, 
               lty = lty)
       if (arr == 1 || arr == 3) {
         igraph.Arrows(
@@ -231,7 +261,7 @@ plot.igraph2 = function (
         if (!is.na(lab.y)) {
           ly <- lab.y
         }
-        text(lx, ly, label, col = edge.label.color, font = edge.label.font, 
+        graphics::text(lx, ly, label, col = edge.label.color, font = edge.label.font, 
              family = edge.label.family, cex = edge.label.cex)
       }
     }
@@ -302,7 +332,7 @@ plot.igraph2 = function (
       lc.y <- lc$lab.y
     }
     else {
-      curved <- rep(curved, length = ecount(graph))[nonloops.e]
+      curved <- rep(curved, length = igraph::ecount(graph))[nonloops.e]
       lc.x <- lc.y <- numeric(length(curved))
       for (code in 0:3) {
         valid <- arrow.mode == code
@@ -337,7 +367,7 @@ plot.igraph2 = function (
     if (!is.null(elab.y)) {
       lc.y <- ifelse(is.na(elab.y), lc.y, elab.y)
     }
-    text(lc.x, lc.y, labels = edge.labels, col = edge.label.color, 
+    graphics::text(lc.x, lc.y, labels = edge.labels, col = edge.label.color, 
          family = edge.label.family, font = edge.label.font, 
          cex = edge.label.cex)
   }
@@ -346,26 +376,26 @@ plot.igraph2 = function (
     .igraph.shapes[[shape[1]]]$plot(layout, params = params)
   }
   else {
-    sapply(seq(length = vcount(graph)), function(x) {
+    sapply(seq(length = igraph::vcount(graph)), function(x) {
       .igraph.shapes[[shape[x]]]$plot(layout[x, , drop = FALSE], 
                                       v = x, params = params)
     })
   }
-  par(xpd = TRUE)
+  graphics::par(xpd = TRUE)
   x <- layout[, 1] + label.dist * cos(-label.degree) * 
     (vertex.size +  6 * 8 * log10(2)) / 200
   y <- layout[, 2] + label.dist * sin(-label.degree) * 
     (vertex.size + 6 * 8 * log10(2)) / 200
   if (length(label.family) == 1) {
-    text(x, y, labels = labels, col = label.color, family = label.family, 
+    graphics::text(x, y, labels = labels, col = label.color, family = label.family, 
          font = label.font, cex = label.cex)
   }
   else {
     if1 <- function(vect, idx) if (length(vect) == 1) 
       vect
     else vect[idx]
-    sapply(seq_len(vcount(graph)), function(v) {
-      text(
+    sapply(seq_len(igraph::vcount(graph)), function(v) {
+      graphics::text(
         x[v], y[v], labels = if1(labels, v), col = if1(label.color, v),
         family = if1(label.family, v), font = if1(label.font,  v), 
         cex = if1(label.cex, v)
@@ -378,19 +408,19 @@ plot.igraph2 = function (
 
 igraph.Arrows2 = function (
   x1, y1, x2, y2, code = 2, size = 1, width = 1.2/4/cin, open = TRUE,
-  sh.adj = 0.1, sh.lwd = 1, sh.col = if (is.R()) par("fg") else 1, 
+  sh.adj = 0.1, sh.lwd = 1, sh.col = if (is.R()) graphics::par("fg") else 1, 
   sh.lty = 1, h.col = sh.col, h.col.bo = sh.col, h.lwd = sh.lwd, 
   h.lty = sh.lty, curved = FALSE
 ) {
-  cin <- size * par("cin")[2]
+  cin <- size * graphics::par("cin")[2]
   
   lx <- length(x1)
   
   uin <- if (is.R()) 
-    1/xyinch()
-  else par("uin")
+    1/graphics::xyinch()
+  else graphics::par("uin")
   
-  delta <- sqrt(h.lwd) * par("cin")[2] * 0.005
+  delta <- sqrt(h.lwd) * graphics::par("cin")[2] * 0.005
   
   #modify for multiple sizes here
   arrlist=lapply(1:length(size),function(w){
@@ -462,7 +492,7 @@ igraph.Arrows2 = function (
   }
   if (is.logical(curved) && all(!curved) || is.numeric(curved) && 
       all(!curved)) {
-    segments(x1 + x1d, y1 + y1d, x2 + x2d, y2 + y2d, lwd = sh.lwd, 
+    graphics::segments(x1 + x1d, y1 + y1d, x2 + x2d, y2 + y2d, lwd = sh.lwd, 
              col = sh.col, lty = sh.lty)
     phi <- atan2(y1 - y2, x1 - x2)
     r <- sqrt((x1 - x2)^2 + (y1 - y2)^2)
@@ -491,7 +521,7 @@ igraph.Arrows2 = function (
     lc.x <- lc.y <- numeric(length(c.x1))
     for (i in seq_len(length(c.x1))) {
       if (lambda[i] == 0) {
-        segments(c.x1[i], c.y1[i], c.x2[i], c.y2[i], 
+        graphics::segments(c.x1[i], c.y1[i], c.x2[i], c.y2[i], 
                  lwd = sh.lwd[i], col = sh.col[i], lty = sh.lty[i])
         phi <- atan2(y1[i] - y2[i], x1[i] - x2[i])
         r <- sqrt((x1[i] - x2[i])^2 + (y1[i] - y2[i])^2)
@@ -499,10 +529,10 @@ igraph.Arrows2 = function (
         lc.y[i] <- y2[i] + 2/3 * r * sin(phi)
       }
       else {
-        spl <- xspline(x = c(c.x1[i], spx[i], c.x2[i]), 
+        spl <- graphics::xspline(x = c(c.x1[i], spx[i], c.x2[i]), 
                        y = c(c.y1[i], spy[i], c.y2[i]), shape = 1, 
                        draw = FALSE)
-        lines(spl, lwd = sh.lwd[i], col = sh.col[i], 
+        graphics::lines(spl, lwd = sh.lwd[i], col = sh.col[i], 
               lty = sh.lty[i])
         if (code %in% c(2, 3)) {
           x1[i] <- spl$x[3 * length(spl$x)/4]
@@ -535,12 +565,12 @@ igraph.Arrows2 = function (
       ttheta <- rep(theta, Rep) + deg.arr
     }
     if (open) 
-      lines(
+      graphics::lines(
         (p.x2 + r.arr * cos(ttheta) / uin[1]),
         (p.y2 + r.arr * sin(ttheta) / uin[2]),
         lwd = h.lwd, col = h.col.bo, lty = h.lty
       )
-    else polygon(
+    else graphics::polygon(
       p.x2 + r.arr * cos(ttheta)/uin[1],
       p.y2 + r.arr * sin(ttheta)/uin[2],
       col = h.col,
@@ -566,14 +596,14 @@ igraph.Arrows2 = function (
     ttheta <- rep(theta, Rep) + rep(deg.arr, lx)
     r.arr <- rep(r.arr, lx)
     if (open) 
-      lines(
+      graphics::lines(
         (p.x2 + r.arr * cos(ttheta)/uin[1]),
         (p.y2 + r.arr * sin(ttheta)/uin[2]),
         lwd = h.lwd,
         col = h.col.bo,
         lty = h.lty
       )
-    else polygon(
+    else graphics::polygon(
       p.x2 + r.arr * cos(ttheta)/uin[1], 
       p.y2 + r.arr * sin(ttheta)/uin[2],
       col = h.col,

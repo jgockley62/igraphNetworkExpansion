@@ -67,10 +67,10 @@ Imports:
 Additional_repositories:
     http://ran.synapse.org
 Remotes:
-	brian-bot/githubr
-	rlbarter/superheat
-	jhrcook/HotNetvieweR
-	blogsdon/spike/spike
+	brian-bot/githubr,
+	rlbarter/superheat,
+	jhrcook/HotNetvieweR,
+	blogsdon/spike/spike,
 VignetteBuilder:
     knitr
 Collate: 

@@ -12,6 +12,8 @@ store_net(
   folder,
   act_name,
   act_desc,
+  synap_import,
+  client_import,
   code = NULL,
   repo = NULL,
   syn_used = NULL,
@@ -35,6 +37,12 @@ store the net}
 
 \item{act_desc}{the description of the syn activity object to}
 
+\item{synap_import}{is the reticulated imported synapse from 
+log_into_synapse()$synapse}
+
+\item{client_import}{is the reticulated imported synapseclient client
+log_into_synapse()$client}
+
 \item{code}{the path of the code which generated the network for the 
 provenance (optional)}
 
@@ -53,8 +61,23 @@ objects}
 a synapse entity of a .graphml subnetwork object stored in synapse
 }
 \description{
-This function takes a network object and pushes it to synapse
+This function takes a network object and pushes it to synapse. The provided 
+example will work assuming that you have edit privliges to the synapse ID
+used as the patent ID (p_id).
 }
 \examples{
+invisible(slim_net)
+syn <- log_into_synapse()
 
+store_net(
+    network  = slim_net , 
+    net_filename = "test_netpush", 
+    net_synname = "test_netpush_network",
+    p_id = "syn25467038", 
+    folder = "test_push",
+    act_name = "This is a test push network",
+    act_desc = "This network was puched here to test the store_net function",
+    synap_import = syn$synapse, 
+    client_import = syn$client
+) 
 }

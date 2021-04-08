@@ -1,4 +1,4 @@
-Package: igraphNetworkyExpansion
+Package: igraphNetworkExpansion
 Title: Trace Subnetworks from an AD Necortical Network of Protein-Protein Interactions
 Version: 0.0.0.1000
 Authors@R: 
@@ -10,8 +10,8 @@ Authors@R:
 Description: This package was bulit to pathtrace network objects consisting of
   protein-protein interactions and scored based on AD risk.
 License: MIT + file LICENSE
-URL: https://github.io/jgockley62/igraph_Network_Expansion,
-    https://github.com/jgockley62/igraph_Network_Expansion
+URL: https://github.io/jgockley62/igraphNetworkExpansion,
+    https://github.com/jgockley62/igraphNetworkExpansion
 Encoding: UTF-8
 LazyData: true
 Suggests: 
@@ -34,7 +34,10 @@ Imports:
 	foreach,
 	ggplot2,
 	ggrepel,
+	githubr,
 	glmnet,
+	graphics,
+	grDevices,
 	httr,
 	igraph,
 	kableExtra,
@@ -55,8 +58,10 @@ Imports:
 	RJSONIO,
 	rmarkdown,
 	scater,
+	stats,
 	sva,
 	tidyr,
+	utils,
 	vbsr,
 	WGCNA
 Additional_repositories:
@@ -68,3 +73,7 @@ Remotes:
 	blogsdon/spike/spike
 VignetteBuilder:
     knitr
+Collate: 
+    'data.R'
+    'functions.R'
+    'igraphplot2.R'

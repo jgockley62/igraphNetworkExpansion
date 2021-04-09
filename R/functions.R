@@ -441,8 +441,8 @@ find_limit <- function ( s_path, t_path, weights, cores=1) {
   ))
 }  
 
-#' Traces the shortest paths of a gene to a vector of target and a vector of 
-#' sentinal genes 
+#' Traces the shortest paths of a gene to a vector of Target Gene and a vector 
+#' of Sentinal Genes 
 #' 
 #' Traces the the shortest paths of target gene paiwise to the target gene list.
 #' then traces the shortest path of the gene to a list of sentinal genes. This

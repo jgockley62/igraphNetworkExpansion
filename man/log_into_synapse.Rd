@@ -21,10 +21,11 @@ User can specify UserID and Password as
 usr and pass respectivly
 }
 \examples{
+\dontrun{
 log_into_synapse()
 log_into_synapse(
    usr = NULL,
    pass = NULL
  )
- 
+ }
 }

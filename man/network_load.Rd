@@ -22,10 +22,12 @@ This Function Loads a network object from synapse using its synapse ID and
 the type of network, ie graphml.
 }
 \examples{
+\dontrun{
 syn <- log_into_synapse()
 net_example <- network_load(
      syn_id = 'syn23247263', 
      form = 'graphml',
      synap_import = syn$synapse
 )
+}
 }

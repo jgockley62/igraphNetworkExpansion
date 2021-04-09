@@ -66,6 +66,7 @@ example will work assuming that you have edit privliges to the synapse ID
 used as the patent ID (p_id).
 }
 \examples{
+\dontrun{
 data(slim_net, package = "igraphNetworkExpansion")
 syn <- log_into_synapse()
 
@@ -80,4 +81,5 @@ store_net(
     synap_import = syn$synapse, 
     client_import = syn$client
 ) 
+}
 }

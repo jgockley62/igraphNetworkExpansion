@@ -2,8 +2,8 @@
 % Please edit documentation in R/functions.R
 \name{short_paths}
 \alias{short_paths}
-\title{Traces the shortest paths of a gene to a vector of target and a vector of 
-sentinal genes}
+\title{Traces the shortest paths of a gene to a vector of Target Gene and a vector 
+of Sentinal Genes}
 \usage{
 short_paths(tnet, target, targets, sentinals, cores = 1)
 }
@@ -29,6 +29,7 @@ function returns the list of genes in a path object which score over the an
 emperically defined limit using the find_limit() function.
 }
 \examples{
+ 
 data(slim_net, package = "igraphNetworkExpansion")
 data(genelists, package = "igraphNetworkExpansion")
 

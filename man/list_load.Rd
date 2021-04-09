@@ -24,7 +24,7 @@ Loads a gene list. If is_syn is TRUE file_path is interperated as a synapse
 ID. Otherwise file_path is interperated as a file path.
 }
 \examples{
-invisible(slim_net)
+data(slim_net)
 all_goterms <- list(
    c(
        'syn25185319', 

@@ -29,8 +29,8 @@ function returns the list of genes in a path object which score over the an
 emperically defined limit using the find_limit() function.
 }
 \examples{
-invisible(slim_net)
-invisible(genelists)
+data(slim_net)
+data(genelists)
 
 example_path <- short_paths(
     tnet = slim_net,

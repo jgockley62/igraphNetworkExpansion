@@ -29,8 +29,8 @@ function returns the list of genes in a path object which score over the an
 emperically defined limit using the find_limit() function.
 }
 \examples{
-data(slim_net)
-data(genelists)
+data(slim_net, package = "igraphNetworkExpansion")
+data(genelists, package = "igraphNetworkExpansion")
 
 example_path <- short_paths(
     tnet = slim_net,

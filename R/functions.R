@@ -55,7 +55,7 @@ log_into_synapse <- function(usr=NULL, pass=NULL) {
 #' log_into_synapse()$synapse default value is NULL
 #' @return genes from the input present within the network
 #' @examples 
-#' data(slim_net)
+#' data(slim_net, package = "igraphNetworkExpansion")
 #' all_goterms <- list(
 #'    c(
 #'        'syn25185319', 
@@ -458,8 +458,8 @@ find_limit <- function ( s_path, t_path, weights, cores=1) {
 #' @return List object of Inter genes from target path traces and Sentinal genes
 #' from sentinal gene traces
 #' @examples 
-#' data(slim_net)
-#' data(genelists)
+#' data(slim_net, package = "igraphNetworkExpansion")
+#' data(genelists, package = "igraphNetworkExpansion")
 #' 
 #' example_path <- short_paths(
 #'     tnet = slim_net,
@@ -601,7 +601,7 @@ trace_filter <- function (path_obj) {
 #' log_into_synapse()$client
 #' @return a synapse entity of a .graphml subnetwork object stored in synapse
 #' @examples 
-#' data(slim_net)
+#' data(slim_net, package = "igraphNetworkExpansion")
 #' syn <- log_into_synapse()
 #' 
 #' store_net(

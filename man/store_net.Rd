@@ -66,7 +66,7 @@ example will work assuming that you have edit privliges to the synapse ID
 used as the patent ID (p_id).
 }
 \examples{
-data(slim_net)
+data(slim_net, package = "igraphNetworkExpansion")
 syn <- log_into_synapse()
 
 store_net(

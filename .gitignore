@@ -1,14 +1,2 @@
-foo.txt
 *.graphml
-ReferenceData/*
-code/*.csv
-*.tsv
-*.RData
-2020_05_17_ReadyForAnote.RData
-code/*.tsv
-code/core*
-code/*.RData
-code/*.pdf
-Data/*
-code/2020_04_16_Progress.RData
-code/core.*
+

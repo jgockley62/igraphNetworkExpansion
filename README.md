@@ -1,3 +1,9 @@
+
+<!-- badges: start -->
+  [![R-CMD-check](https://github.com/jgockley62/igraphNetworkExpansion/workflows/R-CMD-check/badge.svg)](https://github.com/jgockley62/igraphNetworkExpansion/actions)
+[![R-CMD-check](https://github.com/jgockley62/igraphNetworkExpansion/workflows/pkgdown/badge.svg)](https://github.com/jgockley62/igraphNetworkExpansion/actions)
+<!-- badges: end -->
+
 # Igraph Sandbox
 
 ### Install Git, Docker, and Docker-Compose if needed
@@ -83,8 +89,3 @@ docker run -v "~/igraph_Network_Expansion/:~/igraph_Network_Expansion/" -e USER=
 docker run -v /home/jgockley/igraph_Network_Expansion:/home/jgockley/igraph_Network_Expansion -d -p 6080:6080 biodepot/novnc-cynetworkbma
 
 ```
-
-<!-- badges: start -->
-  [![R-CMD-check](https://github.com/jgockley62/igraphNetworkExpansion/workflows/R-CMD-check/badge.svg)](https://github.com/jgockley62/igraphNetworkExpansion/actions)
-[![R-CMD-check](https://github.com/jgockley62/igraphNetworkExpansion/workflows/pkgdown/badge.svg)](https://github.com/jgockley62/igraphNetworkExpansion/actions)
-<!-- badges: end -->

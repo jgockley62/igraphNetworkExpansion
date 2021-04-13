@@ -69,93 +69,29 @@
   <div class="contents col-md-9">
 
 
-<div id="igraph-sandbox" class="section level1">
+<div id="pathway-tracing-package" class="section level1">
 <div class="page-header"><h1 class="hasAnchor">
-<a href="#igraph-sandbox" class="anchor"></a>Igraph Sandbox</h1></div>
-<div id="install-git-docker-and-docker-compose-if-needed" class="section level3">
-<h3 class="hasAnchor">
-<a href="#install-git-docker-and-docker-compose-if-needed" class="anchor"></a>Install Git, Docker, and Docker-Compose if needed</h3>
-<p>This is configured for AWS EC-2 instance</p>
-<pre class="{bash}"><code>sudo yum install -y git
-git version
-
-sudo amazon-linux-extras install docker
-docker version
-
-sudo curl -L https://github.com/docker/compose/releases/download/1.22.0/docker-compose-$(uname -s)-$(uname -m) -o /usr/local/bin/docker-compose
-sudo chmod +x /usr/local/bin/docker-compose
-docker-compose version
-</code></pre>
+<a href="#pathway-tracing-package" class="anchor"></a>Pathway Tracing Package</h1></div>
+<div id="compute-environment-and-sandbox-infrastructure" class="section level2">
+<h2 class="hasAnchor">
+<a href="#compute-environment-and-sandbox-infrastructure" class="anchor"></a>Compute Environment and Sandbox Infrastructure</h2>
+<p>Establishing linked docker containers with an RStudio Sandbox environment and a linux VIM hosted cytoscape application is supported in separate repository. This can be leveraged on and AWS EC2 instance using docker-compose. <code>https://github.com/jgockley62/networktracing</code></p>
 </div>
-<div id="setup-the-git-repo" class="section level3">
-<h3 class="hasAnchor">
-<a href="#setup-the-git-repo" class="anchor"></a>Setup The Git Repo</h3>
-<pre class="{bash}"><code>git clone https://github.com/jgockley62/igraph_Network_Expansion.git
-cd igraph_Network_Expansion    </code></pre>
+<div id="installation" class="section level2">
+<h2 class="hasAnchor">
+<a href="#installation" class="anchor"></a>Installation</h2>
+<p><code><a href="https://remotes.r-lib.org/reference/install_github.html">remotes::install_github("jgockley62/igraphNetworkExpansion")</a></code></p>
 </div>
-<div id="start-docker" class="section level3">
-<h3 class="hasAnchor">
-<a href="#start-docker" class="anchor"></a>Start Docker</h3>
-<pre class="{bash}"><code>sudo service docker start
-sudo usermod -aG docker &lt;USR_ID&gt;</code></pre>
+<div id="building-a-template-tetwork" class="section level2">
+<h2 class="hasAnchor">
+<a href="#building-a-template-tetwork" class="anchor"></a>Building a template tetwork</h2>
 </div>
-<div id="build-rstudio-images" class="section level3">
-<h3 class="hasAnchor">
-<a href="#build-rstudio-images" class="anchor"></a>Build RStudio Images</h3>
-<pre class="{bash}"><code>#RStudio
-docker image build -t network ~/igraph_Network_Expansion/Docker/
-
-#Cytoscape Linux VIM
-docker pull biodepot/novnc-cynetworkbma
-
-#Caddy proxy https login 
-docker build -t cyto-caddy caddy/.</code></pre>
-</div>
-<div id="build-the-envronment-object-containing-login-credentials" class="section level3">
-<h3 class="hasAnchor">
-<a href="#build-the-envronment-object-containing-login-credentials" class="anchor"></a>Build the envronment object containing login credentials</h3>
-<p>This example will create the user name of both IP’s as jgockley and the password as test</p>
-<pre class="{bash}"><code>#Copy the scratch environment file into the used .env file
-sudo cp ENV_Scratch .env
- 
-#Insert the hashed the password for the caddy image
-sudo sed -i  "s/hash/$(docker run --rm -it cyto-caddy caddy hash-password -plaintext 'test')/" .env
-
-#Insert the User name
-sudo sed -i  "s/user/jgockley/" .env
-
-#Insert the RStudio Password 
-sudo sed -i  "s/pass/test/" .env
-</code></pre>
-</div>
-<div id="build-containers" class="section level3">
-<h3 class="hasAnchor">
-<a href="#build-containers" class="anchor"></a>Build Containers</h3>
-<pre class="{bash}"><code>
-docker-compose up -d
-</code></pre>
-</div>
-<div id="ported-browser-access" class="section level3">
-<h3 class="hasAnchor">
-<a href="#ported-browser-access" class="anchor"></a>Ported Browser Access</h3>
-<p>RStudio Instance Available at: <a href="https://" class="uri">https://</a><aws instance ip>:8787</aws></p>
-<p>Caddy Proxy Login to Access Cytoscape NoVNC VIM Available at: <a href="https://" class="uri">https://</a><aws instance ip>:6080</aws></p>
-</div>
-<div id="shut-containers-down" class="section level3">
-<h3 class="hasAnchor">
-<a href="#shut-containers-down" class="anchor"></a>Shut Containers Down</h3>
-<pre class="{bash}"><code>
-docker-compose down -v
-</code></pre>
-</div>
-<div id="deprecated-code" class="section level3">
-<h3 class="hasAnchor">
-<a href="#deprecated-code" class="anchor"></a>Deprecated code</h3>
-<pre class="{bash}"><code>
-docker run -v "~/igraph_Network_Expansion/:~/igraph_Network_Expansion/" -e USER=&lt;USERID&gt; -e PASSWORD=&lt;PassWD&gt; -d -p 8787:8787 &lt;ImageID&gt;
-
-docker run -v /home/jgockley/igraph_Network_Expansion:/home/jgockley/igraph_Network_Expansion -d -p 6080:6080 biodepot/novnc-cynetworkbma
-</code></pre>
+<div id="tracing-a-template-network" class="section level2">
+<h2 class="hasAnchor">
+<a href="#tracing-a-template-network" class="anchor"></a>Tracing a template network</h2>
+<p>The set of functions currently imports 2 gene lists, a targets list and a sentinel list. Tracing paths within the template network occurs pairwise within the targets list and pairwise between each target and each sentinel. Tracing is currently not preformed pairwise from sentinel to sentinel.</p>
+<p>\item Tracing: \ The igraph tracing method currently employed is <code><a href="https://rdrr.io/pkg/igraph/man/distances.html">igraph::get.all.shortest.paths()</a></code>.</p>
+<p>\item Cutoff Limit: \ The path cutoff limit is currently defined from the whichever is greater between the median and mean of traces resulting from the target gene to the sentinel genes. If there are no trace paths in this object the target gene to other target genes trace object is used.</p>
 </div>
 </div>
 

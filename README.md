@@ -86,5 +86,5 @@ docker run -v /home/jgockley/igraph_Network_Expansion:/home/jgockley/igraph_Netw
 
 <!-- badges: start -->
   [![R-CMD-check](https://github.com/jgockley62/igraphNetworkExpansion/workflows/R-CMD-check/badge.svg)](https://github.com/jgockley62/igraphNetworkExpansion/actions)
-[![R-CMD-check](https://github.com/jgockley62/igraphNetworkExpansion/workflows/R-CMD-check/badge.svg)](https://github.com/jgockley62/igraphNetworkExpansion/actions)
+[![R-CMD-check](https://github.com/jgockley62/igraphNetworkExpansion/workflows/pkgdown/badge.svg)](https://github.com/jgockley62/igraphNetworkExpansion/actions)
 <!-- badges: end -->

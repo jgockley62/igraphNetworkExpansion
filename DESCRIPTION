@@ -10,7 +10,7 @@ Authors@R:
 Description: This package was bulit to pathtrace network objects consisting of
   protein-protein interactions and scored based on AD risk.
 License: MIT + file LICENSE
-URL: https://github.io/jgockley62/igraphNetworkExpansion,
+URL: https://jgockley62.github.io/igraphNetworkExpansion/,
     https://github.com/jgockley62/igraphNetworkExpansion
 Encoding: UTF-8
 LazyData: true

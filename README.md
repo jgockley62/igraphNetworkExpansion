@@ -4,88 +4,33 @@
 [![R-CMD-check](https://github.com/jgockley62/igraphNetworkExpansion/workflows/pkgdown/badge.svg)](https://github.com/jgockley62/igraphNetworkExpansion/actions)
 <!-- badges: end -->
 
-# Igraph Sandbox
+# Pathway Tracing Package
 
-### Install Git, Docker, and Docker-Compose if needed
-This is configured for AWS EC-2 instance
-```{bash}
-sudo yum install -y git
-git version
+## Compute Environment and Sandbox Infrastructure
+Establishing linked docker containers with an RStudio Sandbox environment and
+a linux VIM hosted cytoscape application is supported in separate repository. 
+This can be leveraged on and AWS EC2 instance using docker-compose.
+`https://github.com/jgockley62/networktracing`
 
-sudo amazon-linux-extras install docker
-docker version
+## Installation
+`remotes::install_github("jgockley62/igraphNetworkExpansion")`
 
-sudo curl -L https://github.com/docker/compose/releases/download/1.22.0/docker-compose-$(uname -s)-$(uname -m) -o /usr/local/bin/docker-compose
-sudo chmod +x /usr/local/bin/docker-compose
-docker-compose version
+## Building a template tetwork
 
-```
+## Tracing a template network
+The set of functions currently imports 2 gene lists, a targets list and a 
+sentinel list. Tracing paths within the template network occurs pairwise within 
+the targets list and pairwise between each target and each sentinel. Tracing is 
+currently not preformed pairwise from sentinel to sentinel. 
 
-### Setup The Git Repo
-```{bash}
-git clone https://github.com/jgockley62/igraph_Network_Expansion.git
-cd igraph_Network_Expansion    
-```
+\item Tracing: \\
+The igraph tracing method currently employed is `igraph::get.all.shortest.paths()`. 
 
-### Start Docker
-```{bash}
-sudo service docker start
-sudo usermod -aG docker <USR_ID>
-```
+\item Cutoff Limit: \\
+The path cutoff limit is currently defined from the whichever is greater between
+ the median and mean of traces resulting from the target gene to the sentinel
+genes. If there are no trace paths in this object the target gene to other 
+target genes trace object is used. 
 
-### Build RStudio Images
-```{bash}
-#RStudio
-docker image build -t network ~/igraph_Network_Expansion/Docker/
 
-#Cytoscape Linux VIM
-docker pull biodepot/novnc-cynetworkbma
 
-#Caddy proxy https login 
-docker build -t cyto-caddy caddy/.
-```
-### Build the envronment object containing login credentials
-This example will create the user name of both IP's as jgockley and the password as test
-
-```{bash}
-#Copy the scratch environment file into the used .env file
-sudo cp ENV_Scratch .env
- 
-#Insert the hashed the password for the caddy image
-sudo sed -i  "s/hash/$(docker run --rm -it cyto-caddy caddy hash-password -plaintext 'test')/" .env
-
-#Insert the User name
-sudo sed -i  "s/user/jgockley/" .env
-
-#Insert the RStudio Password 
-sudo sed -i  "s/pass/test/" .env
-
-```
-
-### Build Containers
-```{bash}
-
-docker-compose up -d
-
-```
-
-### Ported Browser Access
-RStudio Instance Available at: https://<AWS Instance IP>:8787
-
-Caddy Proxy Login to Access Cytoscape NoVNC VIM Available at: https://<AWS Instance IP>:6080
-
-### Shut Containers Down
-```{bash}
-
-docker-compose down -v
-
-```
-
-### Deprecated code
-```{bash}
-
-docker run -v "~/igraph_Network_Expansion/:~/igraph_Network_Expansion/" -e USER=<USERID> -e PASSWORD=<PassWD> -d -p 8787:8787 <ImageID>
-
-docker run -v /home/jgockley/igraph_Network_Expansion:/home/jgockley/igraph_Network_Expansion -d -p 6080:6080 biodepot/novnc-cynetworkbma
-
-```

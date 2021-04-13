@@ -23,10 +23,10 @@ sentinel list. Tracing paths within the template network occurs pairwise within
 the targets list and pairwise between each target and each sentinel. Tracing is 
 currently not preformed pairwise from sentinel to sentinel. 
 
-\item Tracing: \\
+* Item Tracing: \\
 The igraph tracing method currently employed is `igraph::get.all.shortest.paths()`. 
 
-\item Cutoff Limit: \\
+* Item Cutoff Limit: \\
 The path cutoff limit is currently defined from the whichever is greater between
  the median and mean of traces resulting from the target gene to the sentinel
 genes. If there are no trace paths in this object the target gene to other 

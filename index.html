@@ -90,8 +90,10 @@
 <h2 class="hasAnchor">
 <a href="#tracing-a-template-network" class="anchor"></a>Tracing a template network</h2>
 <p>The set of functions currently imports 2 gene lists, a targets list and a sentinel list. Tracing paths within the template network occurs pairwise within the targets list and pairwise between each target and each sentinel. Tracing is currently not preformed pairwise from sentinel to sentinel.</p>
-<p>\item Tracing: \ The igraph tracing method currently employed is <code><a href="https://rdrr.io/pkg/igraph/man/distances.html">igraph::get.all.shortest.paths()</a></code>.</p>
-<p>\item Cutoff Limit: \ The path cutoff limit is currently defined from the whichever is greater between the median and mean of traces resulting from the target gene to the sentinel genes. If there are no trace paths in this object the target gene to other target genes trace object is used.</p>
+<ul>
+<li><p>Item Tracing: \ The igraph tracing method currently employed is <code><a href="https://rdrr.io/pkg/igraph/man/distances.html">igraph::get.all.shortest.paths()</a></code>.</p></li>
+<li><p>Item Cutoff Limit: \ The path cutoff limit is currently defined from the whichever is greater between the median and mean of traces resulting from the target gene to the sentinel genes. If there are no trace paths in this object the target gene to other target genes trace object is used.</p></li>
+</ul>
 </div>
 </div>
 

@@ -20,6 +20,7 @@ testthat::test_that("find_limit works", {
     "Gene1","Gene2", "GeneUno",
     "Gene12", "Gene13", "GeneOcho"
   )
+  
   limit <- find_limit(
     s_path = example_path,
     t_path =  example_path_b,

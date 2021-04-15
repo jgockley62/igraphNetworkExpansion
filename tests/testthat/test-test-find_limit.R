@@ -26,6 +26,7 @@ testthat::test_that("find_limit works", {
     weights = sampweights,
     cores = 2
   )
+  exp_limit <- list()
   exp_limit$cutoff['Median'] <- 0.780375
   exp_limit$t_verts <- c(0, 0, 0)
   exp_limit$s_verts <- c(0, 0, 0)

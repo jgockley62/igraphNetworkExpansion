@@ -15,7 +15,7 @@ URL: https://jgockley62.github.io/igraphNetworkExpansion/,
 Encoding: UTF-8
 LazyData: true
 Suggests: 
-    testthat (>= 2.1.0)
+    testthat (>= 3.0.0)
 RoxygenNote: 7.1.1
 biocViews:
 Imports:
@@ -77,3 +77,4 @@ Collate:
     'data.R'
     'functions.R'
     'igraphplot2.R'
+Config/testthat/edition: 3

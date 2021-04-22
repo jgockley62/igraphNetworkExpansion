@@ -16,7 +16,7 @@
 #'    pass = NULL
 #'  )
 #'  }
-log_into_synapse <- function(usr=NULL, pass=NULL) {
+  log_into_synapse <- function(usr=NULL, pass=NULL) {
   #install 
   reticulate::conda_create("r-reticulate")
   reticulate::conda_install( channel = 'bioconda', packages="synapseclient")
@@ -41,7 +41,204 @@ log_into_synapse <- function(usr=NULL, pass=NULL) {
   }
   return(list(synapse=client_import,client=synapseclient))
 }
+#' Pull Synapse Table into Dataframe
+#' The purpose. of this function is to pull info from a synapse table into a
+#' dataframe.
+#'
+#' @export
+#' @param syn_id the synapse ID of the ie 'syn25556478' 
+#' @param feature_name the column of the feature to treat as rows ie.'GeneName'
+#' @param features the values of the feature to pull ie. names(igraph::V(net))
+#' @param column_names the column values that. should be pulled for each 
+#'                     feature-row ie c('ENSG', 'GeneName', 'OmicsScore', '
+#'                     GeneticsScore', 'Logsdon')
+#' @param synap_import  is the reticulated imported synapse from 
+#'                      log_into_synapse()$synapse eg. syn
+#' @return a dataframe object
+#' @examples 
+#' \dontrun{
+#' syn <- log_into_synapse()
+#' 
+#' omics_scores <- table_pull( 
+#'  syn_id ='syn25575156',
+#'  feature_name = 'GeneName' ,
+#'  features = names(igraph::V(net)),
+#'  column_names = c('ENSG', 'GeneName', 'OmicsScore', 'GeneticsScore', 'Logsdon'),
+#'  synap_import = syn$synapse
+#' )
+#' }
+table_pull <- function( 
+  syn_id, feature_name, features, column_names, synap_import 
+){
+  df <- read.csv(
+    synap_import$tableQuery(
+      paste0(
+        'SELECT * FROM ',
+        syn_id ,
+        ' WHERE ',
+        feature_name,
+        ' in (\'',
+        paste(
+          features,
+          collapse = '\',\''
+        ),
+        '\')'),
+      resultsAs = 'csv' )$filepath
+  )
+  df <-  df[ , column_names]
+}
+#' Remove Duplicate Gene Entries
+#' The purpose. of this function is to pull info from a synapse table into a
+#' dataframe. Removal can be of all entries with a lower score in a given column
+#' or entries which lack the desired ensg
+#'
+#' @export
+#' @param df the data frame of gene names
+#' @param feature_col the column of the feature to treat as rows ie.'GName'
+#' @param feature the values of the feature to pull ie. NPC1
+#' @param type highest value or ensg ie 'value' or 'ensg'
+#' @param type_spec column name of type ie 'ENSG' or 'Overall'
+#' @param ensg_keep the ensg to retain if method is ensg default = NULL
+#' @return a dataframe object
+#' @examples 
+#' \dontrun{
+#'  syn <- log_into_synapse()
+#'  omics_scores <- dplyr::left_join(
+#'   table_pull(
+#'     syn_id ='syn25575156',
+#'     feature_name = 'GeneName',
+#'     features = names(igraph::V(net)),
+#'     column_names = c('ENSG', 'OmicsScore', 'GeneticsScore', 'Logsdon'),
+#'     synap_import = syn$synapse
+#'   ), 
+#'   table_pull(
+#'     syn_id ='syn22758536',
+#'     feature_name = 'GName',
+#'     features = names(igraph::V(net)),
+#'     column_names = c('ENSG', 'GName', 'RNA_TE', 'Pro_TE'),
+#'     synap_import = syn$synapse
+#'   ), 
+#'   by = 'ENSG'
+#'  )
+#'  colnames(omics_scores)[ colnames(omics_scores) == 'Logsdon' ] <- 'Overall'
+#'  omics_scores <- rm_dups(
+#'    df = omics_scores,
+#'    feature_col = 'GName',
+#'    feature = 'POLR2J3',
+#'    type = 'value',
+#'    type_spec = 'Overall' ,
+#'    ensg_keep = NULL
+#'  )
+#'  omics_scores <- rm_dups(
+#'     df = omics_scores,
+#'     feature_col = 'GName',
+#'     feature = "FCGBP",
+#'     type = 'ensg',
+#'     type_spec = 'ENSG' ,
+#'     ensg_keep = 'ENSG00000281123'
+#'  )
+#' }
+rm_dups <- function(
+  df, feature_col, feature, type, type_spec, ensg_keep = NULL
+) {
+  if(type =='ensg' | type =='value') {
+  }else{
+    stop("ERROR: rm_dups only supports value and ensg as assignments for type")
+  }
+  # if ENSG filter
+  if(type =='ensg'){
+    inds <- row.names( 
+      df[ 
+        !(df[,type_spec] %in% ensg_keep) & 
+          (df[,feature_col] %in% feature), 
+      ]
+    )
+  }else{
+    #Else value filter
+    filt_val <-  max(df[ 
+      (df[,feature_col] %in% feature), 
+    ][,type_spec])
+    
+    inds <- row.names( 
+      df[ 
+        !(df[,type_spec] < filt_val) & 
+          (df[,feature_col] %in% feature), 
+      ]
+    )
+  }
+  df <- df[!(row.names(df) == inds),]
+  row.names(df) <- as.character(c(1:dim(df)[1]))
+  return( df )
+}
 
+#' Remove Duplicate Gene Entries
+#' The purpose. of this function is to pull info from a synapse table into a
+#' dataframe. Removal can be of all entries with a lower score in a given column
+#' or entries which lack the desired ensg
+#'
+#' @export
+#' @param df the data frame contain the vertex ids as renames
+#' @param ig_net the network to annotate
+#' @param v_col the column name of the feature become vertex attribute
+#' @param default_value default vertex values if not present in df default = 0
+#' @return an annotated igraph network object
+#' @examples 
+#' \dontrun{
+#'  data(slim_net, package = "igraphNetworkExpansion")
+#'  syn <- log_into_synapse()
+#'  omics_scores <- dplyr::left_join(
+#'   table_pull(
+#'     syn_id ='syn25575156',
+#'     feature_name = 'GeneName',
+#'     features = names(igraph::V(net)),
+#'     column_names = c('ENSG', 'OmicsScore', 'GeneticsScore', 'Logsdon'),
+#'     synap_import = syn$synapse
+#'   ), 
+#'   table_pull(
+#'     syn_id ='syn22758536',
+#'     feature_name = 'GName',
+#'     features = names(igraph::V(net)),
+#'     column_names = c('ENSG', 'GName', 'RNA_TE', 'Pro_TE'),
+#'     synap_import = syn$synapse
+#'   ), 
+#'   by = 'ENSG'
+#'  )
+#'  colnames(omics_scores)[ colnames(omics_scores) == 'Logsdon' ] <- 'Overall'
+#'  omics_scores <- rm_dups(
+#'    df = omics_scores,
+#'    feature_col = 'GName',
+#'    feature = 'POLR2J3',
+#'    type = 'value',
+#'    type_spec = 'Overall' ,
+#'    ensg_keep = NULL
+#'  )
+#'  omics_scores <- rm_dups(
+#'     df = omics_scores,
+#'     feature_col = 'GName',
+#'     feature = "FCGBP",
+#'     type = 'ensg',
+#'     type_spec = 'ENSG' ,
+#'     ensg_keep = 'ENSG00000281123'
+#'  )
+#'  omics_scores <- omics_scores[ !(is.na(omics_scores$GName)), ]
+#'  row.names(omics_scores) <- omics_scores$GName
+#'  
+#'  net <- vertex_annotate(
+#'    omics_scores,
+#'    slim_net,
+#'    "Overall",
+#'    default_value = 0
+#'  )   
+#'} 
+vertex_annotate <- function(df, ig_net, v_col, default_value = 0) {
+  igraph::vertex_attr(ig_net, v_col, index = igraph::V(ig_net)) <- default_value
+  igraph::vertex_attr(
+    ig_net,
+    v_col,
+    index = igraph::V(ig_net)
+  ) <- df[ names( igraph::V(ig_net)), ][,v_col]
+  return( ig_net )
+}
 #' Loads a Gene List From Synapse
 #'
 #' Loads a gene list. If is_syn is TRUE file_path is interperated as a synapse

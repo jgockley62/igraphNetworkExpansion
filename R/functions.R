@@ -229,7 +229,7 @@ rm_dups <- function(
 #'    "Overall",
 #'    default_value = 0
 #'  )   
-#'} 
+#' } 
 vertex_annotate <- function(df, ig_net, v_col, default_value = 0) {
   igraph::vertex_attr(ig_net, v_col, index = igraph::V(ig_net)) <- default_value
   igraph::vertex_attr(

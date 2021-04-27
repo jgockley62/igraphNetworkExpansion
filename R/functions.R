@@ -41,6 +41,137 @@
   }
   return(list(synapse=client_import,client=synapseclient))
 }
+#' Load and Add names to SIF formatted files
+#' 
+#' The purpose of this function is to load SIF files direct form synapse
+#'
+#' @export
+#' @param sif a caracter vector value of a synID corresponding to a SIF file
+#' @param sif_name the name of a variable corresponding to a vector value that
+#' is a synID 
+#' @param synap_import  is the reticulated imported synapse from 
+#'                      log_into_synapse()$synapse eg. syn
+#' @return a dataframe object of the SIF file named the value of sif_name
+#' @examples 
+#' \dontrun{
+#'   syn <- igraphNetworkExpansion::log_into_synapse()
+#'   sifs <- c('syn21914063')
+#'   names(sifs) <- ('Detailed') 
+#'   sif_file <- sif_boot( sifs, namse(sifs), synap_import )
+#' }  
+sif_boot <- function( sif, sif_name, synap_import){
+  sif_file <- read.table( 
+    file= synap_import$get( sif[sif_name] )$path,
+    header = F,
+    sep='\t'
+  )
+  sif_file$Pathway <- as.character(sif_name) 
+  return(sif_file)
+}
+  
+#' Load and Add namees to a list SIF formatted files
+#' 
+#' The purpose of this function is to load multiple SIF files directly form synapse
+#'
+#' @export
+#' @param  sifs a caracter vector value of a synID corresponding to a SIF file
+#' @param synap_import  is the reticulated imported synapse from 
+#'                      log_into_synapse()$synapse eg. syn
+#' @return a list of SIF dataframes named by the names of the input vector and 
+#'         an igraph network object
+#' @examples 
+#' \dontrun{
+#'   syn <- igraphNetworkExpansion::log_into_synapse()
+#'   sifs <- c('syn21914063', 'syn21914056')
+#'   names(sifs) <- ('Detailed', 'bind') 
+#'   sif_file <- sif_boot( sifs, synap_import )
+#' }  
+sif_loader <- function( sifs, synap_import){
+  # load the files
+  total_list <- list()
+  trial <- for( i in names(sifs) ){
+    temp <- igraphNetworkExpansion::sif_boot( sifs[i], i, synap_import )
+    total_list[[i]] <- temp
+  }
+  
+  # Combine and Name the columns of the SIF files
+  total <- do.call(rbind, total_list)
+  total <- total[ , c("V1", "V3", "V2", "Pathway") ]
+  colnames(total) <- c("from", "to", "interaction", "pathway")
+  
+  # Calculate how many times this interaction was found in all databases:
+  total$Occurance <- paste0(
+    total$from, '-',
+    total$to, ':',
+    total$interaction
+  )
+  occurances <- paste0(
+    total$from, '-',
+    total$to, ':',
+    total$interaction
+  )
+  table_occurances<- table(occurances)
+  total$Occurance <-  as.numeric( table_occurances[ total$Occurance ] )
+  
+  genes <- c(as.character(total$from), as.character(total$to))
+  genes <- genes[!duplicated(genes)]
+  genes <- as.data.frame( genes )
+  
+  # Make the pathway column into a list object
+  total$UniqCol <- paste0( 
+    as.character(total$from), ':',
+    as.character(total$to), '-',
+    as.character(total$interaction) 
+  )
+  dt <- data.table::data.table(total[, c('UniqCol','pathway')])
+  data <- dt[,lapply(
+    .SD,
+    function(col) paste(
+      col,
+      collapse=", ")
+    ),
+    by=.(UniqCol)]
+  
+  sinl<-data
+  
+  temps <- as.data.frame(data)
+  path <- as.list(strsplit(as.character(temps$pathway),','))
+  names(path) <- temps$UniqCol
+  
+  totals <- total[ !duplicated(total$UniqCol), ]
+  pathways <- path
+  
+  table(names(pathways) == as.character(totals$UniqCol))
+  table( as.character(totals$UniqCol) == names(pathways) )
+  
+  totals$PATH <- pathways
+  totals$PATH <- lapply( 
+    totals$PATH,
+    function(x) gsub(" ","", x)
+  )
+  
+  total <- totals[,c("from", "to", "interaction", "Occurance", "UniqCol", "PATH")]
+  colnames(total) <- c("from", "to", "interaction", "Occurance", "UniqCol", "pathway")
+  
+  # Make into a network graph
+  graph <- list()
+  for(type in levels(total$interaction) ){
+    eval( parse( text=paste0(
+      'graph$`',
+      type,
+      '` <- igraph::graph_from_data_frame(d=total[ total$interaction == \'',
+      type,
+      '\', ], vertices=genes, directed=T) '
+    )))
+  }
+  # Another way to make the Network object But has multiple edges per-Vertex set
+  net_oldStyle <- igraph::graph_from_data_frame(d=total, vertices=genes, directed=T) 
+  return( list( df=total, net=net_oldStyle, graph=graph ) )
+}
+
+
+
+
 #' Pull Synapse Table into Dataframe
 #' The purpose. of this function is to pull info from a synapse table into a
 #' dataframe.

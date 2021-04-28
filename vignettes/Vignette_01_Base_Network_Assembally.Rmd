@@ -15,7 +15,7 @@ knitr::opts_chunk$set(
 ```
 
 ### Pull SIF intereaction files from synapse
-```{r pullsif, include = FALSE}
+```{r pullsif, include = FALSE, eval = FALSE}
 syn <- igraphNetworkExpansion::log_into_synapse()
 
 #> Define the SIF formatted files stored in synapse to use for net construction 
@@ -122,4 +122,3 @@ data <- list(
 )
 
 ```
-

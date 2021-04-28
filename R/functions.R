@@ -125,7 +125,7 @@ sif_loader <- function( sifs, synap_import){
   )
   dt <- data.table::data.table(total[, c('UniqCol','pathway')])
   data <- dt[,lapply(
-    .SD,
+    data.table::.SD,
     function(col) paste(
       col,
       collapse=", ")

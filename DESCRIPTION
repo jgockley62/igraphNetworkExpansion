@@ -43,6 +43,7 @@ Imports:
 	kableExtra,
 	knitr,
 	limma,
+	markdown,
 	optmatch,
 	org.Hs.eg.db,
 	parallel,

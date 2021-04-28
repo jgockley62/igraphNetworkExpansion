@@ -72,7 +72,7 @@ sif_boot <- function( sif, sif_name, synap_import){
 #' Load and Add namees to a list SIF formatted files
 #' 
 #' The purpose of this function is to load multiple SIF files directly form synapse
-#'
+#' @importFrom data.table .SD
 #' @export
 #' @param  sifs a caracter vector value of a synID corresponding to a SIF file
 #' @param synap_import  is the reticulated imported synapse from 
@@ -124,7 +124,6 @@ sif_loader <- function( sifs, synap_import){
     as.character(total$interaction) 
   )
   dt <- data.table::data.table(total[, c('UniqCol','pathway')])
-  .SD <- NULL
   data <- dt[,lapply(
     .SD,
     function(col) paste(

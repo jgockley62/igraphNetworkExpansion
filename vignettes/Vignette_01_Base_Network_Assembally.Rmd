@@ -16,6 +16,7 @@ knitr::opts_chunk$set(
 
 ### Pull SIF intereaction files from synapse
 ```{r pullsif, include = FALSE, eval = FALSE}
+library(foreach)
 syn <- igraphNetworkExpansion::log_into_synapse()
 
 #> Define the SIF formatted files stored in synapse to use for net construction 
@@ -81,7 +82,7 @@ temp_total <- total[ ,c('Edge','Occurance')]
 temp_total$Occurance <- as.numeric(temp_total$Occurance)
 
 #> Run Sum Tally this can take a while!
-cl <- parallel::makeCluster( detectCores()-2 )
+cl <- parallel::makeCluster( parallel::detectCores()-2 )
 doParallel::registerDoParallel(cl)
 
 len <- length(names(total_occurence))

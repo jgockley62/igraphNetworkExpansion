@@ -90,7 +90,7 @@ mark<-Sys.time()
 total_occurances <- foreach(i=names(total_occurence)[1:len], .combine=rbind ) %dopar% sumtally(i, temp_total)
 Sys.time()-mark
 
-stopCluster(cl)
+parallel::stopCluster(cl)
 
 row.names(total_occurances) <- total_occurances[,1]
 total_occurances <- as.data.frame(total_occurances)
@@ -104,22 +104,24 @@ genes <- genes[ !duplicated(genes) ]
 genes <- as.data.frame( genes )
 
 graph <- list()
+total$interaction <- as.factor(total$interaction)
 for(type in levels(total$interaction) ){
     eval(parse(text=paste0(
       'graph$`',
       type,
-      '` <- graph_from_data_frame(d=Total[ Total$interaction == \'',
+      '` <- igraph::graph_from_data_frame(d=total[ total$interaction == \'',
       type,
-      '\', ], vertices=Genes, directed=T) '
+      '\', ], vertices=genes, directed=T) '
     )))
 }
 
-#> Finalize the dataframe object and base network
-network <- graph_from_data_frame(d=total, vertices=genes, directed=T) 
+#> Finalize the data frame object and base network
+network <- igraph::graph_from_data_frame(d=total, vertices=genes, directed=T) 
 data <- list(
   data_frame=total,
   network = network,
   graph = graph
 )
-
+#> Data corresponds to the object imported by:
+#> data(basic_network, package = "igraphNetworkExpansion")
 ```

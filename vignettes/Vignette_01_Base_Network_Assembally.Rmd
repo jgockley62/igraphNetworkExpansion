@@ -123,5 +123,7 @@ data <- list(
   graph = graph
 )
 #> Data corresponds to the object imported by:
-#> data(basic_network, package = "igraphNetworkExpansion")
+#> network - data(basic_network, package = "igraphNetworkExpansion")
+#> graph - data(basic_network_interactions, package = "igraphNetworkExpansion")
+#> data_frame - data(basic_network_table, package = "igraphNetworkExpansion")
 ```

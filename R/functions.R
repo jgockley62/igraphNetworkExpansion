@@ -60,7 +60,7 @@
 #'   sif_file <- sif_boot( sifs, namse(sifs), synap_import )
 #' }  
 sif_boot <- function( sif, sif_name, synap_import){
-  sif_file <- read.table( 
+  sif_file <- utils::read.table( 
     file= synap_import$get( sif[sif_name] )$path,
     header = F,
     sep='\t'
@@ -201,7 +201,7 @@ sif_loader <- function( sifs, synap_import){
 table_pull <- function( 
   syn_id, feature_name, features, column_names, synap_import 
 ){
-  df <- read.csv(
+  df <- utils::read.csv(
     synap_import$tableQuery(
       paste0(
         'SELECT * FROM ',

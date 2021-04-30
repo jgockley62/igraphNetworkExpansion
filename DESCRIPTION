@@ -47,7 +47,6 @@ Imports:
 	optmatch,
 	org.Hs.eg.db,
 	parallel,
-	paxtoolsr,
 	pheatmap,
 	plotrix,
 	plyr,

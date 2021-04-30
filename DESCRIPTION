@@ -43,10 +43,10 @@ Imports:
 	kableExtra,
 	knitr,
 	limma,
+	markdown,
 	optmatch,
 	org.Hs.eg.db,
 	parallel,
-	paxtoolsr,
 	pheatmap,
 	plotrix,
 	plyr,
@@ -78,3 +78,5 @@ Collate:
     'functions.R'
     'igraphplot2.R'
 Config/testthat/edition: 3
+Depends: 
+    R (>= 2.10)

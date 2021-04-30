@@ -62,3 +62,76 @@
 #'   ...
 #' }
 "genelists"
+
+#' Basic Network Object 
+#'
+#' The basic Pathway Commons network. This is all SIF Pathway commons 
+#' interactions loaded into a network. The CHEMI interactions are present. The
+#' igraph network object consisting of 30,910 genes and 1,902,605 
+#'  interactions. basic_network$graph is a list of networks. Each 
+#' network is every interaction in Pathway Commons consisting of a specific type
+#' of interaction.
+#'
+#' @format A list object
+#' \describe{
+#'   \item{igraph::V(basic_network$network)}{Vertex names}
+#'   \item{igraph::E(basic_network$network)}{Network edges}
+#'   \item{igraph::E(basic_network$network)$interaction}{Type of interaction}
+#'   \item{igraph::E(basic_network$network)$Occurance}{How many Pathway Commons 
+#'   databases record an interaction between to and from vertex}
+#'   \item{igraph::E(basic_network$network)$UniqCol}{The Unique Code of the 
+#'   entire interaction}
+#'   \item{igraph::E(basic_network$network)$pathway}{The Pathway(s) in Pathway 
+#'   commons this interaction is documented in as a list object}
+#'   \item{igraph::E(basic_network$network)$EdgeRep}{How many interaction types 
+#'   are there between to and from vertacies}
+#'   \item{igraph::E(basic_network$network)$Edge}{The to:from name desigantion 
+#'   of the edge}
+#'   \item{igraph::E(basic_network$network)$SumOccurancel}{how many times is to
+#'    vertex connected to from vertex across all pathway commons data bases and 
+#'    interaction types}
+#'   ...
+#' }
+"basic_network"
+
+#' Basic Network Table 
+#'
+#' The basic Pathway Commons table that comprises the foundation of the network
+#' This is all SIF Pathway commons interactions loaded into a network. The 
+#' CHEMI interactions are present. The igraph network object consisting of 
+#' 30,910 genes and 1,902,605 interactions. 
+#'
+#' @format A list object
+#' \describe{
+#'   \item{basic_network_table$total}{total Pathway Commons Database in an dataframe}
+#'   \item{basic_network_table$to}{Origin Vertex}
+#'   \item{basic_network_table$from}{Target Vertex}
+#'   \item{basic_network_table$interaction}{Type of interaction}
+#'   \item{basic_network_table$Occurance}{how many Pathway Commons databases record an
+#'   interaction between to and from vertex}
+#'   \item{basic_network_table$UniqCol}{The Unique Code of the entire interaction}
+#'   \item{basic_network_table$pathway}{The Pathway(s) in Pathway commons this 
+#'   interaction is documented in as a list object}
+#'   \item{basic_network_table$EdgeRep}{How many interaction types are there between 
+#'   to and from vertacies }
+#'   \item{basic_network_table$Edge}{The to:from name desigantion of the edge}
+#'   \item{basic_network_table$SumOccurancel}{how many times is to vertex connected to
+#'    from vertex across all pathway commons data bases and interaction types}
+#'   \item{basic_network$graph}{A list of igraph network objects by interaction 
+#'   type, all edge and vertex attributes are the same as basic_network$network}
+#'   ...
+#' }
+"basic_network_table"
+
+#' Basic Network Interactions
+#'
+#' This Resources is a list of networks. Each network is every interaction in 
+#' Pathway Commons consisting of a specific type of interaction.
+#'
+#' @format A list object
+#' \describe{
+#'   \item{basic_network_interactions}{A list of igraph network objects by interaction 
+#'   type, all edge and vertex attributes are the same as basic_network$network}
+#'   ...
+#' }
+"basic_network_interactions"

@@ -16,7 +16,7 @@
 #'    pass = NULL
 #'  )
 #'  }
-log_into_synapse <- function(usr=NULL, pass=NULL) {
+  log_into_synapse <- function(usr=NULL, pass=NULL) {
   #install 
   reticulate::conda_create("r-reticulate")
   reticulate::conda_install( channel = 'bioconda', packages="synapseclient")
@@ -41,7 +41,335 @@ log_into_synapse <- function(usr=NULL, pass=NULL) {
   }
   return(list(synapse=client_import,client=synapseclient))
 }
+#' Load and Add names to SIF formatted files
+#' 
+#' The purpose of this function is to load SIF files direct form synapse
+#'
+#' @export
+#' @param sif a caracter vector value of a synID corresponding to a SIF file
+#' @param sif_name the name of a variable corresponding to a vector value that
+#' is a synID 
+#' @param synap_import  is the reticulated imported synapse from 
+#'                      log_into_synapse()$synapse eg. syn
+#' @return a dataframe object of the SIF file named the value of sif_name
+#' @examples 
+#' \dontrun{
+#'   syn <- igraphNetworkExpansion::log_into_synapse()
+#'   sifs <- c('syn21914063')
+#'   names(sifs) <- ('Detailed') 
+#'   sif_file <- sif_boot( sifs, namse(sifs), synap_import )
+#' }  
+sif_boot <- function( sif, sif_name, synap_import){
+  sif_file <- utils::read.table( 
+    file= synap_import$get( sif[sif_name] )$path,
+    header = F,
+    sep='\t'
+  )
+  sif_file$Pathway <- as.character(sif_name) 
+  return(sif_file)
+}
+  
+#' Load and Add namees to a list SIF formatted files
+#' 
+#' The purpose of this function is to load multiple SIF files directly form synapse
+#' @importFrom data.table .SD
+#' @export
+#' @param  sifs a caracter vector value of a synID corresponding to a SIF file
+#' @param synap_import  is the reticulated imported synapse from 
+#'                      log_into_synapse()$synapse eg. syn
+#' @return a list of SIF dataframes named by the names of the input vector and 
+#'         an igraph network object
+#' @examples 
+#' \dontrun{
+#'   syn <- igraphNetworkExpansion::log_into_synapse()
+#'   sifs <- c('syn21914063', 'syn21914056')
+#'   names(sifs) <- ('Detailed', 'bind') 
+#'   sif_file <- sif_boot( sifs, synap_import )
+#' }  
+sif_loader <- function( sifs, synap_import){
+  # load the files
+  total_list <- list()
+  trial <- for( i in names(sifs) ){
+    temp <- igraphNetworkExpansion::sif_boot( sifs[i], i, synap_import )
+    total_list[[i]] <- temp
+  }
+  
+  # Combine and Name the columns of the SIF files
+  total <- do.call(rbind, total_list)
+  total <- total[ , c("V1", "V3", "V2", "Pathway") ]
+  colnames(total) <- c("from", "to", "interaction", "pathway")
+  
+  # Calculate how many times this interaction was found in all databases:
+  total$Occurance <- paste0(
+    total$from, '-',
+    total$to, ':',
+    total$interaction
+  )
+  occurances <- paste0(
+    total$from, '-',
+    total$to, ':',
+    total$interaction
+  )
+  table_occurances<- table(occurances)
+  total$Occurance <-  as.numeric( table_occurances[ total$Occurance ] )
+  
+  genes <- c(as.character(total$from), as.character(total$to))
+  genes <- genes[!duplicated(genes)]
+  genes <- as.data.frame( genes )
+  
+  # Make the pathway column into a list object
+  total$UniqCol <- paste0( 
+    as.character(total$from), ':',
+    as.character(total$to), '-',
+    as.character(total$interaction) 
+  )
+  dt <- data.table::data.table(total[, c('UniqCol','pathway')])
+  data <- dt[,lapply(
+    .SD,
+    function(col) paste(
+      col,
+      collapse=", ")
+    ),
+    by=.(UniqCol)]
+  
+  sinl<-data
+  
+  temps <- as.data.frame(data)
+  path <- as.list(strsplit(as.character(temps$pathway),','))
+  names(path) <- temps$UniqCol
+  
+  totals <- total[ !duplicated(total$UniqCol), ]
+  pathways <- path
+  
+  table(names(pathways) == as.character(totals$UniqCol))
+  table( as.character(totals$UniqCol) == names(pathways) )
+  
+  totals$PATH <- pathways
+  totals$PATH <- lapply( 
+    totals$PATH,
+    function(x) gsub(" ","", x)
+  )
+  
+  total <- totals[,c("from", "to", "interaction", "Occurance", "UniqCol", "PATH")]
+  colnames(total) <- c("from", "to", "interaction", "Occurance", "UniqCol", "pathway")
+  
+  # Make into a network graph
+  graph <- list()
+  for(type in levels(total$interaction) ){
+    eval( parse( text=paste0(
+      'graph$`',
+      type,
+      '` <- igraph::graph_from_data_frame(d=total[ total$interaction == \'',
+      type,
+      '\', ], vertices=genes, directed=T) '
+    )))
+  }
+  # Another way to make the Network object But has multiple edges per-Vertex set
+  net_oldStyle <- igraph::graph_from_data_frame(d=total, vertices=genes, directed=T) 
+  return( list( df=total, net=net_oldStyle, graph=graph ) )
+}
 
+
+
+
+#' Pull Synapse Table into Dataframe
+#' The purpose. of this function is to pull info from a synapse table into a
+#' dataframe.
+#'
+#' @export
+#' @param syn_id the synapse ID of the ie 'syn25556478' 
+#' @param feature_name the column of the feature to treat as rows ie.'GeneName'
+#' @param features the values of the feature to pull ie. names(igraph::V(net))
+#' @param column_names the column values that. should be pulled for each 
+#'                     feature-row ie c('ENSG', 'GeneName', 'OmicsScore', '
+#'                     GeneticsScore', 'Logsdon')
+#' @param synap_import  is the reticulated imported synapse from 
+#'                      log_into_synapse()$synapse eg. syn
+#' @return a dataframe object
+#' @examples 
+#' \dontrun{
+#' syn <- log_into_synapse()
+#' 
+#' omics_scores <- table_pull( 
+#'  syn_id ='syn25575156',
+#'  feature_name = 'GeneName' ,
+#'  features = names(igraph::V(net)),
+#'  column_names = c('ENSG', 'GeneName', 'OmicsScore', 'GeneticsScore', 'Logsdon'),
+#'  synap_import = syn$synapse
+#' )
+#' }
+table_pull <- function( 
+  syn_id, feature_name, features, column_names, synap_import 
+){
+  df <- utils::read.csv(
+    synap_import$tableQuery(
+      paste0(
+        'SELECT * FROM ',
+        syn_id ,
+        ' WHERE ',
+        feature_name,
+        ' in (\'',
+        paste(
+          features,
+          collapse = '\',\''
+        ),
+        '\')'),
+      resultsAs = 'csv' )$filepath
+  )
+  df <-  df[ , column_names]
+}
+#' Remove Duplicate Gene Entries
+#' The purpose. of this function is to pull info from a synapse table into a
+#' dataframe. Removal can be of all entries with a lower score in a given column
+#' or entries which lack the desired ensg
+#'
+#' @export
+#' @param df the data frame of gene names
+#' @param feature_col the column of the feature to treat as rows ie.'GName'
+#' @param feature the values of the feature to pull ie. NPC1
+#' @param type highest value or ensg ie 'value' or 'ensg'
+#' @param type_spec column name of type ie 'ENSG' or 'Overall'
+#' @param ensg_keep the ensg to retain if method is ensg default = NULL
+#' @return a dataframe object
+#' @examples 
+#' \dontrun{
+#'  syn <- log_into_synapse()
+#'  omics_scores <- dplyr::left_join(
+#'   table_pull(
+#'     syn_id ='syn25575156',
+#'     feature_name = 'GeneName',
+#'     features = names(igraph::V(net)),
+#'     column_names = c('ENSG', 'OmicsScore', 'GeneticsScore', 'Logsdon'),
+#'     synap_import = syn$synapse
+#'   ), 
+#'   table_pull(
+#'     syn_id ='syn22758536',
+#'     feature_name = 'GName',
+#'     features = names(igraph::V(net)),
+#'     column_names = c('ENSG', 'GName', 'RNA_TE', 'Pro_TE'),
+#'     synap_import = syn$synapse
+#'   ), 
+#'   by = 'ENSG'
+#'  )
+#'  colnames(omics_scores)[ colnames(omics_scores) == 'Logsdon' ] <- 'Overall'
+#'  omics_scores <- rm_dups(
+#'    df = omics_scores,
+#'    feature_col = 'GName',
+#'    feature = 'POLR2J3',
+#'    type = 'value',
+#'    type_spec = 'Overall' ,
+#'    ensg_keep = NULL
+#'  )
+#'  omics_scores <- rm_dups(
+#'     df = omics_scores,
+#'     feature_col = 'GName',
+#'     feature = "FCGBP",
+#'     type = 'ensg',
+#'     type_spec = 'ENSG' ,
+#'     ensg_keep = 'ENSG00000281123'
+#'  )
+#' }
+rm_dups <- function(
+  df, feature_col, feature, type, type_spec, ensg_keep = NULL
+) {
+  if(type =='ensg' | type =='value') {
+  }else{
+    stop("ERROR: rm_dups only supports value and ensg as assignments for type")
+  }
+  # if ENSG filter
+  if(type =='ensg'){
+    inds <- row.names( 
+      df[ 
+        !(df[,type_spec] %in% ensg_keep) & 
+          (df[,feature_col] %in% feature), 
+      ]
+    )
+  }else{
+    #Else value filter
+    filt_val <-  max(df[ 
+      (df[,feature_col] %in% feature), 
+    ][,type_spec])
+    
+    inds <- row.names( 
+      df[ 
+        !(df[,type_spec] < filt_val) & 
+          (df[,feature_col] %in% feature), 
+      ]
+    )
+  }
+  df <- df[!(row.names(df) == inds),]
+  row.names(df) <- as.character(c(1:dim(df)[1]))
+  return( df )
+}
+
+#' Remove Duplicate Gene Entries
+#' The purpose. of this function is to pull info from a synapse table into a
+#' dataframe. Removal can be of all entries with a lower score in a given column
+#' or entries which lack the desired ensg
+#'
+#' @export
+#' @param df the data frame contain the vertex ids as renames
+#' @param ig_net the network to annotate
+#' @param v_col the column name of the feature become vertex attribute
+#' @param default_value default vertex values if not present in df default = 0
+#' @return an annotated igraph network object
+#' @examples 
+#' \dontrun{
+#'  data(slim_net, package = "igraphNetworkExpansion")
+#'  syn <- log_into_synapse()
+#'  omics_scores <- dplyr::left_join(
+#'   table_pull(
+#'     syn_id ='syn25575156',
+#'     feature_name = 'GeneName',
+#'     features = names(igraph::V(net)),
+#'     column_names = c('ENSG', 'OmicsScore', 'GeneticsScore', 'Logsdon'),
+#'     synap_import = syn$synapse
+#'   ), 
+#'   table_pull(
+#'     syn_id ='syn22758536',
+#'     feature_name = 'GName',
+#'     features = names(igraph::V(net)),
+#'     column_names = c('ENSG', 'GName', 'RNA_TE', 'Pro_TE'),
+#'     synap_import = syn$synapse
+#'   ), 
+#'   by = 'ENSG'
+#'  )
+#'  colnames(omics_scores)[ colnames(omics_scores) == 'Logsdon' ] <- 'Overall'
+#'  omics_scores <- rm_dups(
+#'    df = omics_scores,
+#'    feature_col = 'GName',
+#'    feature = 'POLR2J3',
+#'    type = 'value',
+#'    type_spec = 'Overall' ,
+#'    ensg_keep = NULL
+#'  )
+#'  omics_scores <- rm_dups(
+#'     df = omics_scores,
+#'     feature_col = 'GName',
+#'     feature = "FCGBP",
+#'     type = 'ensg',
+#'     type_spec = 'ENSG' ,
+#'     ensg_keep = 'ENSG00000281123'
+#'  )
+#'  omics_scores <- omics_scores[ !(is.na(omics_scores$GName)), ]
+#'  row.names(omics_scores) <- omics_scores$GName
+#'  
+#'  net <- vertex_annotate(
+#'    omics_scores,
+#'    slim_net,
+#'    "Overall",
+#'    default_value = 0
+#'  )   
+#' } 
+vertex_annotate <- function(df, ig_net, v_col, default_value = 0) {
+  igraph::vertex_attr(ig_net, v_col, index = igraph::V(ig_net)) <- default_value
+  igraph::vertex_attr(
+    ig_net,
+    v_col,
+    index = igraph::V(ig_net)
+  ) <- df[ names( igraph::V(ig_net)), ][,v_col]
+  return( ig_net )
+}
 #' Loads a Gene List From Synapse
 #'
 #' Loads a gene list. If is_syn is TRUE file_path is interperated as a synapse

@@ -1,0 +1,129 @@
+---
+title: "Pull Pathway Commons Data and Assemble Base Dataframe"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Assemble Base Network}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+### Pull SIF intereaction files from synapse
+```{r pullsif, include = FALSE, eval = FALSE}
+library(foreach)
+syn <- igraphNetworkExpansion::log_into_synapse()
+
+#> Define the SIF formatted files stored in synapse to use for net construction 
+sif_files <- c(
+  'syn21914063', 'syn21914056', 'syn21914057', 'syn21914059', 'syn21914061',
+  'syn21914064', 'syn21914065', 'syn21914070', 'syn21914071', 'syn21914072',
+  'syn21914078', 'syn21914082', 'syn21914083', 'syn21914087', 'syn21914090',
+  'syn21914091', 'syn21914093', 'syn21914094', 'syn21914074'
+)
+
+names(sif_files) <- c(
+  'Detailed',  'bind',  'biogrid',  'corum',  'ctd',
+  'dip', 'drugbank', 'hprd', 'humancyc', 'intacsyngnc',
+  'msigdb', 'netpath', 'panther', 'pathbank', 'pid',
+  'psp', 'reactome', 'reconx', 'kegg'
+)
+
+#> Load the SIF Files and Construct the igraph Network Object
+#Data <- sif_loader(sif_files, syn$synapse)
+loaded_data <- igraphNetworkExpansion::sif_loader(sif_files, syn$synapse)
+total <- loaded_data$df
+net_oldStyle <- loaded_data$net
+graph <- loaded_data$graph
+
+#> Network Interaction Summary
+tot <- 0
+for(type in levels(total$interaction) ){
+  message(paste0(
+    type, ": ",
+    eval(parse(text=paste0(
+      'length(igraph::E(graph$`',
+      type,
+      '`))'
+    )))
+  ))
+  tot <- eval(parse(text=paste0(
+    'length(igraph::E(graph$`',
+    type,
+    '`))'
+  ))) + tot
+}
+message( paste0( "Total Interactions = ", tot ) )
+
+
+#> EdgeRep The number of distinct edge types between from_gene and to_gene
+total$EdgeRep <- 0
+total$Edge <- paste0( total$from, ':',  total$to )
+key <- table( total$Edge )
+total$EdgeRep <- key[ total$Edge ]
+
+#> total_occurence The number of times from_gene and to_gene are connected 
+#> total_occurence is regaurdless of interaction or database. It is the gross
+#> sum of interactions
+total_occurence <- rep(0, length(names(key)))
+names( total_occurence ) <- names(key)
+
+sumtally <- function(name, df) {
+  value <- sum( df[ df$Edge == name, ]$Occurance )
+  return(c(name, value))
+}
+
+temp_total <- total[ ,c('Edge','Occurance')]
+temp_total$Occurance <- as.numeric(temp_total$Occurance)
+
+#> Run Sum Tally this can take a while!
+cl <- parallel::makeCluster( parallel::detectCores()-2 )
+doParallel::registerDoParallel(cl)
+
+len <- length(names(total_occurence))
+mark<-Sys.time()
+total_occurances <- foreach(i=names(total_occurence)[1:len], .combine=rbind ) %dopar% sumtally(i, temp_total)
+Sys.time()-mark
+
+parallel::stopCluster(cl)
+
+row.names(total_occurances) <- total_occurances[,1]
+total_occurances <- as.data.frame(total_occurances)
+total_occurances$V2 <- as.numeric(as.character(total_occurances$V2))
+head(total_occurances[ total$Edge, ])
+
+total$SumOccurence <- total_occurances[ total$Edge, ]$V2
+
+genes <- c( as.character(total$from), as.character(total$to) )
+genes <- genes[ !duplicated(genes) ]
+genes <- as.data.frame( genes )
+
+graph <- list()
+total$interaction <- as.factor(total$interaction)
+for(type in levels(total$interaction) ){
+    eval(parse(text=paste0(
+      'graph$`',
+      type,
+      '` <- igraph::graph_from_data_frame(d=total[ total$interaction == \'',
+      type,
+      '\', ], vertices=genes, directed=T) '
+    )))
+}
+
+#> Finalize the data frame object and base network
+network <- igraph::graph_from_data_frame(d=total, vertices=genes, directed=T) 
+data <- list(
+  data_frame=total,
+  network = network,
+  graph = graph
+)
+#> Data corresponds to the object imported by:
+#> network - data(basic_network, package = "igraphNetworkExpansion")
+#> graph - data(basic_network_interactions, package = "igraphNetworkExpansion")
+#> data_frame - data(basic_network_table, package = "igraphNetworkExpansion")
+```

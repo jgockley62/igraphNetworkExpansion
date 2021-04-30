@@ -6,7 +6,7 @@
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<title>Log into Synapse — log_into_synapse • igraphNetworkExpansion</title>
+<title>Basic Network Table — basic_network_table • igraphNetworkExpansion</title>
 
 
 <!-- jquery -->
@@ -39,10 +39,11 @@
 
 
 
-<meta property="og:title" content="Log into Synapse — log_into_synapse" />
-<meta property="og:description" content="Log into Synapse. Assumes credentials are stored.
-User can specify UserID and Password as
-usr and pass respectivly" />
+<meta property="og:title" content="Basic Network Table — basic_network_table" />
+<meta property="og:description" content="The basic Pathway Commons table that comprises the foundation of the network
+This is all SIF Pathway commons interactions loaded into a network. The 
+CHEMI interactions are present. The igraph network object consisting of 
+30,910 genes and 1,902,605 interactions." />
 
 
 
@@ -122,46 +123,45 @@ usr and pass respectivly" />
 <div class="row">
   <div class="col-md-9 contents">
     <div class="page-header">
-    <h1>Log into Synapse</h1>
-    <small class="dont-index">Source: <a href='https://github.com/jgockley62/igraphNetworkExpansion/blob/master/R/functions.R'><code>R/functions.R</code></a></small>
-    <div class="hidden name"><code>log_into_synapse.Rd</code></div>
+    <h1>Basic Network Table</h1>
+    <small class="dont-index">Source: <a href='https://github.com/jgockley62/igraphNetworkExpansion/blob/master/R/data.R'><code>R/data.R</code></a></small>
+    <div class="hidden name"><code>basic_network_table.Rd</code></div>
     </div>
 
     <div class="ref-description">
-    <p>Log into Synapse. Assumes credentials are stored.
-User can specify UserID and Password as
-usr and pass respectivly</p>
+    <p>The basic Pathway Commons table that comprises the foundation of the network
+This is all SIF Pathway commons interactions loaded into a network. The 
+CHEMI interactions are present. The igraph network object consisting of 
+30,910 genes and 1,902,605 interactions.</p>
     </div>
 
-    <pre class="usage"><span class='fu'>log_into_synapse</span><span class='op'>(</span>usr <span class='op'>=</span> <span class='cn'>NULL</span>, pass <span class='op'>=</span> <span class='cn'>NULL</span><span class='op'>)</span></pre>
+    <pre class="usage"><span class='va'>basic_network_table</span></pre>
 
-    <h2 class="hasAnchor" id="arguments"><a class="anchor" href="#arguments"></a>Arguments</h2>
-    <table class="ref-arguments">
-    <colgroup><col class="name" /><col class="desc" /></colgroup>
-    <tr>
-      <th>usr</th>
-      <td><p>A single value character vector of the users Synapse ID</p></td>
-    </tr>
-    <tr>
-      <th>pass</th>
-      <td><p>A single value character vector of the users Synapse Password</p></td>
-    </tr>
-    </table>
 
-    <h2 class="hasAnchor" id="value"><a class="anchor" href="#value"></a>Value</h2>
+    <h2 class="hasAnchor" id="format"><a class="anchor" href="#format"></a>Format</h2>
 
-    <p>Synapse login object to use in list_load(), store_net(), and 
-network_load()</p>
+    <p>A list object</p><dl>
+  <dt>basic_network_table$total</dt><dd><p>total Pathway Commons Database in an dataframe</p></dd>
+  <dt>basic_network_table$to</dt><dd><p>Origin Vertex</p></dd>
+  <dt>basic_network_table$from</dt><dd><p>Target Vertex</p></dd>
+  <dt>basic_network_table$interaction</dt><dd><p>Type of interaction</p></dd>
+  <dt>basic_network_table$Occurance</dt><dd><p>how many Pathway Commons databases record an
+  interaction between to and from vertex</p></dd>
+  <dt>basic_network_table$UniqCol</dt><dd><p>The Unique Code of the entire interaction</p></dd>
+  <dt>basic_network_table$pathway</dt><dd><p>The Pathway(s) in Pathway commons this 
+  interaction is documented in as a list object</p></dd>
+  <dt>basic_network_table$EdgeRep</dt><dd><p>How many interaction types are there between 
+  to and from vertacies</p></dd>
+  <dt>basic_network_table$Edge</dt><dd><p>The to:from name desigantion of the edge</p></dd>
+  <dt>basic_network_table$SumOccurancel</dt><dd><p>how many times is to vertex connected to
+   from vertex across all pathway commons data bases and interaction types</p></dd>
+  <dt>basic_network$graph</dt><dd><p>A list of igraph network objects by interaction 
+  type, all edge and vertex attributes are the same as basic_network$network</p></dd>
+  ...
 
-    <h2 class="hasAnchor" id="examples"><a class="anchor" href="#examples"></a>Examples</h2>
-    <pre class="examples"><div class='input'><span class='kw'>if</span> <span class='op'>(</span><span class='cn'>FALSE</span><span class='op'>)</span> <span class='op'>{</span>
-<span class='fu'>log_into_synapse</span><span class='op'>(</span><span class='op'>)</span>
-<span class='fu'>log_into_synapse</span><span class='op'>(</span>
-   usr <span class='op'>=</span> <span class='cn'>NULL</span>,
-   pass <span class='op'>=</span> <span class='cn'>NULL</span>
- <span class='op'>)</span>
- <span class='op'>}</span>
-</div></pre>
+</dl>
+
+
   </div>
   <div class="col-md-3 hidden-xs hidden-sm" id="pkgdown-sidebar">
     <nav id="toc" data-toggle="toc" class="sticky-top">

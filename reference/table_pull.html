@@ -6,7 +6,9 @@
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<title>Log into Synapse — log_into_synapse • igraphNetworkExpansion</title>
+<title>Pull Synapse Table into Dataframe
+The purpose. of this function is to pull info from a synapse table into a
+dataframe. — table_pull • igraphNetworkExpansion</title>
 
 
 <!-- jquery -->
@@ -39,10 +41,12 @@
 
 
 
-<meta property="og:title" content="Log into Synapse — log_into_synapse" />
-<meta property="og:description" content="Log into Synapse. Assumes credentials are stored.
-User can specify UserID and Password as
-usr and pass respectivly" />
+<meta property="og:title" content="Pull Synapse Table into Dataframe
+The purpose. of this function is to pull info from a synapse table into a
+dataframe. — table_pull" />
+<meta property="og:description" content="Pull Synapse Table into Dataframe
+The purpose. of this function is to pull info from a synapse table into a
+dataframe." />
 
 
 
@@ -122,45 +126,65 @@ usr and pass respectivly" />
 <div class="row">
   <div class="col-md-9 contents">
     <div class="page-header">
-    <h1>Log into Synapse</h1>
+    <h1>Pull Synapse Table into Dataframe
+The purpose. of this function is to pull info from a synapse table into a
+dataframe.</h1>
     <small class="dont-index">Source: <a href='https://github.com/jgockley62/igraphNetworkExpansion/blob/master/R/functions.R'><code>R/functions.R</code></a></small>
-    <div class="hidden name"><code>log_into_synapse.Rd</code></div>
+    <div class="hidden name"><code>table_pull.Rd</code></div>
     </div>
 
     <div class="ref-description">
-    <p>Log into Synapse. Assumes credentials are stored.
-User can specify UserID and Password as
-usr and pass respectivly</p>
+    <p>Pull Synapse Table into Dataframe
+The purpose. of this function is to pull info from a synapse table into a
+dataframe.</p>
     </div>
 
-    <pre class="usage"><span class='fu'>log_into_synapse</span><span class='op'>(</span>usr <span class='op'>=</span> <span class='cn'>NULL</span>, pass <span class='op'>=</span> <span class='cn'>NULL</span><span class='op'>)</span></pre>
+    <pre class="usage"><span class='fu'>table_pull</span><span class='op'>(</span><span class='va'>syn_id</span>, <span class='va'>feature_name</span>, <span class='va'>features</span>, <span class='va'>column_names</span>, <span class='va'>synap_import</span><span class='op'>)</span></pre>
 
     <h2 class="hasAnchor" id="arguments"><a class="anchor" href="#arguments"></a>Arguments</h2>
     <table class="ref-arguments">
     <colgroup><col class="name" /><col class="desc" /></colgroup>
     <tr>
-      <th>usr</th>
-      <td><p>A single value character vector of the users Synapse ID</p></td>
+      <th>syn_id</th>
+      <td><p>the synapse ID of the ie 'syn25556478'</p></td>
     </tr>
     <tr>
-      <th>pass</th>
-      <td><p>A single value character vector of the users Synapse Password</p></td>
+      <th>feature_name</th>
+      <td><p>the column of the feature to treat as rows ie.'GeneName'</p></td>
+    </tr>
+    <tr>
+      <th>features</th>
+      <td><p>the values of the feature to pull ie. names(igraph::V(net))</p></td>
+    </tr>
+    <tr>
+      <th>column_names</th>
+      <td><p>the column values that. should be pulled for each 
+feature-row ie c('ENSG', 'GeneName', 'OmicsScore', '
+GeneticsScore', 'Logsdon')</p></td>
+    </tr>
+    <tr>
+      <th>synap_import</th>
+      <td><p>is the reticulated imported synapse from 
+log_into_synapse()$synapse eg. syn</p></td>
     </tr>
     </table>
 
     <h2 class="hasAnchor" id="value"><a class="anchor" href="#value"></a>Value</h2>
 
-    <p>Synapse login object to use in list_load(), store_net(), and 
-network_load()</p>
+    <p>a dataframe object</p>
 
     <h2 class="hasAnchor" id="examples"><a class="anchor" href="#examples"></a>Examples</h2>
     <pre class="examples"><div class='input'><span class='kw'>if</span> <span class='op'>(</span><span class='cn'>FALSE</span><span class='op'>)</span> <span class='op'>{</span>
-<span class='fu'>log_into_synapse</span><span class='op'>(</span><span class='op'>)</span>
-<span class='fu'>log_into_synapse</span><span class='op'>(</span>
-   usr <span class='op'>=</span> <span class='cn'>NULL</span>,
-   pass <span class='op'>=</span> <span class='cn'>NULL</span>
- <span class='op'>)</span>
- <span class='op'>}</span>
+<span class='va'>syn</span> <span class='op'>&lt;-</span> <span class='fu'><a href='log_into_synapse.html'>log_into_synapse</a></span><span class='op'>(</span><span class='op'>)</span>
+
+<span class='va'>omics_scores</span> <span class='op'>&lt;-</span> <span class='fu'>table_pull</span><span class='op'>(</span> 
+ syn_id <span class='op'>=</span><span class='st'>'syn25575156'</span>,
+ feature_name <span class='op'>=</span> <span class='st'>'GeneName'</span> ,
+ features <span class='op'>=</span> <span class='fu'><a href='https://rdrr.io/r/base/names.html'>names</a></span><span class='op'>(</span><span class='fu'>igraph</span><span class='fu'>::</span><span class='fu'><a href='https://rdrr.io/pkg/igraph/man/V.html'>V</a></span><span class='op'>(</span><span class='va'>net</span><span class='op'>)</span><span class='op'>)</span>,
+ column_names <span class='op'>=</span> <span class='fu'><a href='https://rdrr.io/r/base/c.html'>c</a></span><span class='op'>(</span><span class='st'>'ENSG'</span>, <span class='st'>'GeneName'</span>, <span class='st'>'OmicsScore'</span>, <span class='st'>'GeneticsScore'</span>, <span class='st'>'Logsdon'</span><span class='op'>)</span>,
+ synap_import <span class='op'>=</span> <span class='va'>syn</span><span class='op'>$</span><span class='va'>synapse</span>
+<span class='op'>)</span>
+<span class='op'>}</span>
 </div></pre>
   </div>
   <div class="col-md-3 hidden-xs hidden-sm" id="pkgdown-sidebar">

@@ -6,7 +6,7 @@
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<title>Log into Synapse — log_into_synapse • igraphNetworkExpansion</title>
+<title>Load and Add names to SIF formatted files — sif_boot • igraphNetworkExpansion</title>
 
 
 <!-- jquery -->
@@ -39,10 +39,8 @@
 
 
 
-<meta property="og:title" content="Log into Synapse — log_into_synapse" />
-<meta property="og:description" content="Log into Synapse. Assumes credentials are stored.
-User can specify UserID and Password as
-usr and pass respectivly" />
+<meta property="og:title" content="Load and Add names to SIF formatted files — sif_boot" />
+<meta property="og:description" content="The purpose of this function is to load SIF files direct form synapse" />
 
 
 
@@ -122,45 +120,47 @@ usr and pass respectivly" />
 <div class="row">
   <div class="col-md-9 contents">
     <div class="page-header">
-    <h1>Log into Synapse</h1>
+    <h1>Load and Add names to SIF formatted files</h1>
     <small class="dont-index">Source: <a href='https://github.com/jgockley62/igraphNetworkExpansion/blob/master/R/functions.R'><code>R/functions.R</code></a></small>
-    <div class="hidden name"><code>log_into_synapse.Rd</code></div>
+    <div class="hidden name"><code>sif_boot.Rd</code></div>
     </div>
 
     <div class="ref-description">
-    <p>Log into Synapse. Assumes credentials are stored.
-User can specify UserID and Password as
-usr and pass respectivly</p>
+    <p>The purpose of this function is to load SIF files direct form synapse</p>
     </div>
 
-    <pre class="usage"><span class='fu'>log_into_synapse</span><span class='op'>(</span>usr <span class='op'>=</span> <span class='cn'>NULL</span>, pass <span class='op'>=</span> <span class='cn'>NULL</span><span class='op'>)</span></pre>
+    <pre class="usage"><span class='fu'>sif_boot</span><span class='op'>(</span><span class='va'>sif</span>, <span class='va'>sif_name</span>, <span class='va'>synap_import</span><span class='op'>)</span></pre>
 
     <h2 class="hasAnchor" id="arguments"><a class="anchor" href="#arguments"></a>Arguments</h2>
     <table class="ref-arguments">
     <colgroup><col class="name" /><col class="desc" /></colgroup>
     <tr>
-      <th>usr</th>
-      <td><p>A single value character vector of the users Synapse ID</p></td>
+      <th>sif</th>
+      <td><p>a caracter vector value of a synID corresponding to a SIF file</p></td>
     </tr>
     <tr>
-      <th>pass</th>
-      <td><p>A single value character vector of the users Synapse Password</p></td>
+      <th>sif_name</th>
+      <td><p>the name of a variable corresponding to a vector value that
+is a synID</p></td>
+    </tr>
+    <tr>
+      <th>synap_import</th>
+      <td><p>is the reticulated imported synapse from 
+log_into_synapse()$synapse eg. syn</p></td>
     </tr>
     </table>
 
     <h2 class="hasAnchor" id="value"><a class="anchor" href="#value"></a>Value</h2>
 
-    <p>Synapse login object to use in list_load(), store_net(), and 
-network_load()</p>
+    <p>a dataframe object of the SIF file named the value of sif_name</p>
 
     <h2 class="hasAnchor" id="examples"><a class="anchor" href="#examples"></a>Examples</h2>
     <pre class="examples"><div class='input'><span class='kw'>if</span> <span class='op'>(</span><span class='cn'>FALSE</span><span class='op'>)</span> <span class='op'>{</span>
-<span class='fu'>log_into_synapse</span><span class='op'>(</span><span class='op'>)</span>
-<span class='fu'>log_into_synapse</span><span class='op'>(</span>
-   usr <span class='op'>=</span> <span class='cn'>NULL</span>,
-   pass <span class='op'>=</span> <span class='cn'>NULL</span>
- <span class='op'>)</span>
- <span class='op'>}</span>
+  <span class='va'>syn</span> <span class='op'>&lt;-</span> <span class='fu'>igraphNetworkExpansion</span><span class='fu'>::</span><span class='fu'><a href='log_into_synapse.html'>log_into_synapse</a></span><span class='op'>(</span><span class='op'>)</span>
+  <span class='va'>sifs</span> <span class='op'>&lt;-</span> <span class='fu'><a href='https://rdrr.io/r/base/c.html'>c</a></span><span class='op'>(</span><span class='st'>'syn21914063'</span><span class='op'>)</span>
+  <span class='fu'><a href='https://rdrr.io/r/base/names.html'>names</a></span><span class='op'>(</span><span class='va'>sifs</span><span class='op'>)</span> <span class='op'>&lt;-</span> <span class='op'>(</span><span class='st'>'Detailed'</span><span class='op'>)</span> 
+  <span class='va'>sif_file</span> <span class='op'>&lt;-</span> <span class='fu'>sif_boot</span><span class='op'>(</span> <span class='va'>sifs</span>, <span class='fu'>namse</span><span class='op'>(</span><span class='va'>sifs</span><span class='op'>)</span>, <span class='va'>synap_import</span> <span class='op'>)</span>
+<span class='op'>}</span>  
 </div></pre>
   </div>
   <div class="col-md-3 hidden-xs hidden-sm" id="pkgdown-sidebar">

@@ -52,6 +52,7 @@ Imports:
 	plyr,
 	RColorBrewer,
 	RCy3,
+	remotes,
 	reshape,
 	reticulate,
 	Rglpk,

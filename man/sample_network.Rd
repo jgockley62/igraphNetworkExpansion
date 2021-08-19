@@ -3,7 +3,7 @@
 \docType{data}
 \name{sample_network}
 \alias{sample_network}
-\title{Sample simple network}
+\title{Sample  network}
 \format{
 An igraph network object
 \describe{

@@ -1063,3 +1063,190 @@ network_load <- function (syn_id, form, synap_import) {
   )
   return(import_net)
 }
+
+#' Base Network Processing For PPI Enrichment
+#' 
+#' Processes a base network object for PPI enrichment tests. Takes the user 
+#' supplied base network converts to a data frame. Removes duplicated edges.
+#' Tabulates the probability of seeing an interaction of the types specified in 
+#' `vect`.
+#' 
+#' @param i_net the initial network object eg. basic_network
+#' @param vect the edge attributes to tabulate
+#' @param filt the edge attribute name to remove duplicates of default. Edge
+#' 
+#' @example 
+#' \dontrun{
+#' data(basic_network)
+#' base_net_ppi( 
+#'  i_net = basic_network, 
+#'  vect =c( 'Brain', 'Heart', 'Kidney', 'Liver',
+#'     'Lung', 'Muscle', 'Thymus'
+#'   ) 
+#' )
+#' }
+base_net_ppi <- function( i_net,vect,filt='Edge' ){
+  base_df <- igraph::as_data_frame( i_net )
+  if(!is.null(filt)) {
+    base_df <- base_df[ !duplicated(base_df[,filt]), ]
+  }else{}
+  output <- list(
+    Sums = apply(base_df[,vect],2,sum),
+    Probs = apply(base_df[,vect],2,sum)/dim(base_df)[1],
+    N = dim(base_df)[1]
+  )
+  return(output)
+}
+
+#' Derived Network Processing For PPI Enrichment
+#' 
+#' Processes a a list object of derived network object(s) for PPI enrichment 
+#' tests. Takes the user supplied base networks converts to a data frame.
+#' Removes duplicated edges.
+#' Tabulates the probability of seeing an interaction of the types specified in 
+#' `vect`.
+#' 
+#' @param d_net a list of derived network object(s) eg. list(test_net_A)
+#' @param vect the edge attributes to tabulate
+#' @param filt the edge attribute name to remove duplicates of default. Edge
+#' 
+#' @example 
+#' \dontrun{
+#' derived_net_ppi( 
+#'  i_net = list(basic_network), 
+#'  vect =c( 'Brain', 'Heart', 'Kidney', 'Liver',
+#'     'Lung', 'Muscle', 'Thymus'
+#'   ) 
+#' )
+#' }
+derived_net_ppi <- function( d_net,vect,filt='Edge' ){
+  output <- list()
+  for( nam in names(d_net) ){
+    output[[nam]] <- base_net_ppi(i_net=d_net[[nam]],vect=vect,filt=filt)
+  }
+  return(output)
+}
+
+#' PPI Enrichment
+#' 
+#' Takes inputs of base network stats from `base_net_ppi` in the form of a list
+#' and derived network stats from `derived_net_ppi` in the form of a list of 
+#' lists.  
+#' 
+#' @param base The Base Enrichment Network Stats from `base_net_ppi`
+#' @param derived The Derived Enrichment Network Stats from `derived_net_ppi`
+#' 
+#' @example 
+#' \dontrun{
+#' data(basic_network)
+#' base <- base_net_ppi( 
+#'  i_net = basic_network, 
+#'  vect =c( 'Brain', 'Heart', 'Kidney', 'Liver',
+#'     'Lung', 'Muscle', 'Thymus'
+#'   ) 
+#' )
+#' }
+#' derived <- derived_net_ppi( 
+#'  i_net = list(basic_network), 
+#'  vect =c( 'Brain', 'Heart', 'Kidney', 'Liver',
+#'     'Lung', 'Muscle', 'Thymus'
+#'   ) 
+#' )
+#' ppi_enrichment(base=base, derived=derived)
+#' }
+ppi_enrichment <- function( base,derived ){
+  # Test to confirm that the inputs are calculated from the same feature set
+  if( FALSE %in% (names(base$Probs) == names(derived[[1]]$Probs)) ){
+    stop("Different Feature Sets in base and derived stats inputs")
+    
+  }else{}
+  # Build Output
+  output <- list( 
+    Pval = matrix(0,  length(derived$A$Probs), length(derived) ),
+    FoldEnrich = matrix(0,  length(derived$A$Probs), length(derived) )
+  )
+  row.names(output$Pval) <- names(derived$A$Probs)
+  row.names(output$FoldEnrich) <- names(derived$A$Probs)
+  
+  colnames(output$Pval) <- names(derived)
+  colnames(output$FoldEnrich) <- names(derived)
+  
+  # Run Enrichment Tests:
+  for(test_dnet in names(derived)) {
+    for(feature in names(derived[[test_dnet]]$Probs)) {
+      # Binomial test inputs
+      x <- as.numeric(derived[[test_dnet]]$Sums[feature])
+      p <- as.numeric(base$Probs[feature])
+      n <- as.numeric(derived[[test_dnet]]$N)
+      
+      # Run binomial test and store outputs:
+      b_test <- binom.test( x=x, p=p, n=n )
+      output$Pval[ feature,test_dnet ] <- p.adjust(
+        b_test$p.value, 
+        method = "bonferroni", 
+        n = length(derived[[test_dnet]]$Probs)
+      )
+      
+      # Find and store fold Enrichment 
+      p_derived <- (derived[[test_dnet]]$Sums[feature] / derived[[test_dnet]]$N) 
+      p_base <- base$Probs[feature]
+      output$FoldEnrich[ feature,test_dnet ] <- p_derived/p_base
+    }
+  }
+  return(output)
+}
+
+#' Plot PPI Enrichment
+#' 
+#' Takes PPI enrichment object from `ppi_enrichment` and plots it with either
+#' scaled or non-scaled values
+#' 
+#' @param enrich_obj enrichment object from `ppi_enrichment`
+#' @param scaled Scale the fold change by filter methods of each tissue 
+#' default No. Values accepted; YES or NO
+#' 
+#' @example 
+#' \dontrun{
+#' data(basic_network)
+#' base <- base_net_ppi( 
+#'  i_net = basic_network, 
+#'  vect =c( 'Brain', 'Heart', 'Kidney', 'Liver',
+#'     'Lung', 'Muscle', 'Thymus'
+#'   ) 
+#' )
+#' }
+#' derived <- derived_net_ppi( 
+#'  i_net = list(basic_network), 
+#'  vect =c( 'Brain', 'Heart', 'Kidney', 'Liver',
+#'     'Lung', 'Muscle', 'Thymus'
+#'   ) 
+#' )
+#' ppi_enrichment(base=base, derived=derived)
+#' plot_enrich(ppi_enrichment)
+#' }
+plot_enrich <- function( enrich_obj,scaled='NO'){
+  
+  if( scaled== 'NO' ) {
+    legend_labled <- "Fold Change"
+  }else{
+    enrich_obj$FoldEnrich <- scale(enrich_obj$FoldEnrich)
+    legend_labled <- "Scaled Fold Change"
+  }
+  plot_obj <- as.data.frame(
+    cbind( 
+      reshape2::melt(enrich_obj$FoldEnrich),
+      reshape2::melt(enrich_obj$Pval) 
+    )[,c(1,2,3,6)]
+  )
+  
+  colnames(plot_obj) <- c('Tissue', 'Filter', 'FoldChange', 'PVal')
+  plot_obj$stars <- cut(plot_obj$PVal, breaks=c(-Inf, 0.001, 0.01, 0.05, Inf), label=c("***", "**", "*", ""))
+  
+  p <- ggplot2::ggplot(ggplot2::aes(x=Filter, y=Tissue, fill=FoldChange), data=plot_obj)
+  p <- p + ggplot2::geom_tile() + ggplot2::scale_fill_gradient2(low="#D7191C", mid="white", high="#2C7BB6") + 
+    ggplot2::geom_text(ggplot2::aes(label=stars), color="black", size=5) + 
+    ggplot2::labs(y=NULL, x=NULL, fill=legend_labled) + 
+    ggplot2::theme_bw() + ggplot2::theme(axis.text.x=ggplot2::element_text(angle = -45, hjust = 0))
+  return(p)
+}
+

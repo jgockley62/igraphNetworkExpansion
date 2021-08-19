@@ -74,22 +74,56 @@
 #'
 #' @format A list object
 #' \describe{
-#'   \item{igraph::V(basic_network$network)}{Vertex names}
-#'   \item{igraph::E(basic_network$network)}{Network edges}
-#'   \item{igraph::E(basic_network$network)$interaction}{Type of interaction}
-#'   \item{igraph::E(basic_network$network)$Occurance}{How many Pathway Commons 
+#'   \item{igraph::V(basic_network)}{Vertex names}
+#'   \item{igraph::E(basic_network)}{Network edges}
+#'   \item{igraph::E(basic_network)$interaction}{Type of interaction}
+#'   \item{igraph::E(basic_network)$Occurance}{How many Pathway Commons 
 #'   databases record an interaction between to and from vertex}
-#'   \item{igraph::E(basic_network$network)$UniqCol}{The Unique Code of the 
+#'   \item{igraph::E(basic_network)$UniqCol}{The Unique Code of the 
 #'   entire interaction}
-#'   \item{igraph::E(basic_network$network)$pathway}{The Pathway(s) in Pathway 
+#'   \item{igraph::E(basic_network)$pathway}{The Pathway(s) in Pathway 
 #'   commons this interaction is documented in as a list object}
-#'   \item{igraph::E(basic_network$network)$EdgeRep}{How many interaction types 
+#'   \item{igraph::E(basic_network)$EdgeRep}{How many interaction types 
 #'   are there between to and from vertacies}
-#'   \item{igraph::E(basic_network$network)$Edge}{The to:from name desigantion 
+#'   \item{igraph::E(basic_network)$Edge}{The to:from name desigantion 
 #'   of the edge}
-#'   \item{igraph::E(basic_network$network)$SumOccurancel}{how many times is to
+#'   \item{igraph::E(basic_network)$SumOccurancel}{how many times is to
 #'    vertex connected to from vertex across all pathway commons data bases and 
 #'    interaction types}
+#'  \item{igraph::E(basic_network)$Uniq_Brain}{Edges with a PPI in Skinnider 
+#'    et.al 2021 that is unique to brain are denoted with a 1}
+#'  \item{igraph::E(basic_network)$Brain}{Edges with a PPI in Skinnider 
+#'    et.al 2021 that in brain are denoted with a 1}
+#'  \item{igraph::E(basic_network)$Uniq_Heart}{Edges with a PPI in Skinnider 
+#'    et.al 2021 that is unique to Heart are denoted with a 1}
+#'  \item{igraph::E(basic_network)$Heart}{Edges with a PPI in Skinnider 
+#'    et.al 2021 that in Heart are denoted with a 1}
+#'  \item{igraph::E(basic_network)$Uniq_Kidney}{Edges with a PPI in Skinnider 
+#'    et.al 2021 that is unique to Kidney are denoted with a 1}
+#'  \item{igraph::E(basic_network)$Kidney}{Edges with a PPI in Skinnider 
+#'    et.al 2021 that in Kidney are denoted with a 1}
+#'  \item{igraph::E(basic_network)$Uniq_Liver}{Edges with a PPI in Skinnider 
+#'    et.al 2021 that is unique to Liver are denoted with a 1}
+#'  \item{igraph::E(basic_network)$Liver}{Edges with a PPI in Skinnider 
+#'    et.al 2021 that in Liver are denoted with a 1}
+#'  \item{igraph::E(basic_network)$Uniq_Lung}{Edges with a PPI in Skinnider 
+#'    et.al 2021 that is unique to Lung are denoted with a 1}
+#'  \item{igraph::E(basic_network)$Lung}{Edges with a PPI in Skinnider 
+#'    et.al 2021 that in Lung are denoted with a 1}
+#'  \item{igraph::E(basic_network)$Uniq_Muscle}{Edges with a PPI in Skinnider 
+#'    et.al 2021 that is unique to Muscle are denoted with a 1}
+#'  \item{igraph::E(basic_network)$Muscle}{Edges with a PPI in Skinnider 
+#'    et.al 2021 that in Muscle are denoted with a 1}
+#'  \item{igraph::E(basic_network)$Uniq_Thymus}{Edges with a PPI in Skinnider 
+#'    et.al 2021 that is unique to Thymus are denoted with a 1}
+#'  \item{igraph::E(basic_network)$Thymus}{Edges with a PPI in Skinnider 
+#'    et.al 2021 that in Thymus are denoted with a 1}
+#'  \item{igraph::E(basic_network)$all_nonbrain}{Edges with a PPI in Skinnider 
+#'    et.al 2021 that is observed in any tissue except Braing are denoted with 
+#'    a 1}
+#'  \item{igraph::E(basic_network)$all_uniq_nonbrain}{Edges with a PPI in 
+#'  Skinnider et.al 2021 that are observed uniquely in any tissue except Brain
+#'  are denoted with a 1}
 #'   ...
 #' }
 "basic_network"
@@ -103,7 +137,53 @@
 #'
 #' @format A data table
 #' \describe{
-#'   
+#'   \item{basic_network_table$to}{Origin Vertex}
+#'   \item{basic_network_table$from}{Target Vertex}
+#'   \item{basic_network_table$interaction}{Type of interaction}
+#'   \item{basic_network_table$Occurance}{how many Pathway Commons databases record an
+#'     interaction between to and from vertex}
+#'   \item{basic_network_table$UniqCol}{The Unique Code of the entire interaction}
+#'   \item{basic_network_table$pathway}{The Pathway(s) in Pathway commons this 
+#'     interaction is documented in as a list object}
+#'   \item{basic_network_table$EdgeRep}{How many interaction types are there between 
+#'     to and from vertacies }
+#'   \item{basic_network_table$Edge}{The to:from name desigantion of the edge}
+#'   \item{basic_network_table$SumOccurancel}{how many times is to vertex connected to
+#'     from vertex across all pathway commons data bases and interaction types}
+#'   \item{basic_network_table$Uniq_Brain}{Edges with a PPI in Skinnider 
+#'     et.al 2021 that is unique to brain are denoted with a 1}
+#'   \item{basic_network_table$Brain}{Edges with a PPI in Skinnider 
+#'     et.al 2021 that in brain are denoted with a 1}
+#'   \item{basic_network_table$Uniq_Heart}{Edges with a PPI in Skinnider 
+#'     et.al 2021 that is unique to Heart are denoted with a 1}
+#'   \item{basic_network_table$Heart}{Edges with a PPI in Skinnider 
+#'     et.al 2021 that in Heart are denoted with a 1}
+#'   \item{basic_network_table$Uniq_Kidney}{Edges with a PPI in Skinnider 
+#'     et.al 2021 that is unique to Kidney are denoted with a 1}
+#'   \item{basic_network_table$Kidney}{Edges with a PPI in Skinnider 
+#'     et.al 2021 that in Kidney are denoted with a 1}
+#'   \item{basic_network_table$Uniq_Liver}{Edges with a PPI in Skinnider 
+#'     et.al 2021 that is unique to Liver are denoted with a 1}
+#'   \item{basic_network_table$Liver}{Edges with a PPI in Skinnider 
+#'     et.al 2021 that in Liver are denoted with a 1}
+#'   \item{basic_network_table$Uniq_Lung}{Edges with a PPI in Skinnider 
+#'     et.al 2021 that is unique to Lung are denoted with a 1}
+#'   \item{basic_network_table$Lung}{Edges with a PPI in Skinnider 
+#'     et.al 2021 that in Lung are denoted with a 1}
+#'   \item{basic_network_table$Uniq_Muscle}{Edges with a PPI in Skinnider 
+#'     et.al 2021 that is unique to Muscle are denoted with a 1}
+#'   \item{basic_network_table$Muscle}{Edges with a PPI in Skinnider 
+#'      et.al 2021 that in Muscle are denoted with a 1}
+#'    \item{basic_network_table$Uniq_Thymus}{Edges with a PPI in Skinnider 
+#'      et.al 2021 that is unique to Thymus are denoted with a 1}
+#'   \item{basic_network_table$Thymus}{Edges with a PPI in Skinnider 
+#'     et.al 2021 that in Thymus are denoted with a 1}
+#'   \item{basic_network_table$all_nonbrain}{Edges with a PPI in Skinnider 
+#'     et.al 2021 that is observed in any tissue except Braing are denoted with 
+#'     a 1}
+#'   \item{basic_network_table$all_uniq_nonbrain}{Edges with a PPI in Skinnider 
+#'     et.al 2021 that are observed uniquely in any tissue except Brain are 
+#'     denoted with a 1}
 #'   ...
 #' }
 "basic_network_table"

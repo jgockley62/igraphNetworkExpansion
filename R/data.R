@@ -103,23 +103,11 @@
 #'
 #' @format A data table
 #' \describe{
-#'   \item{basic_network_table$to}{Origin Vertex}
-#'   \item{basic_network_table$from}{Target Vertex}
-#'   \item{basic_network_table$interaction}{Type of interaction}
-#'   \item{basic_network_table$Occurance}{how many Pathway Commons databases record an
-#'   interaction between to and from vertex}
-#'   \item{basic_network_table$UniqCol}{The Unique Code of the entire interaction}
-#'   \item{basic_network_table$pathway}{The Pathway(s) in Pathway commons this 
-#'   interaction is documented in as a list object}
-#'   \item{basic_network_table$EdgeRep}{How many interaction types are there between 
-#'   to and from vertacies }
-#'   \item{basic_network_table$Edge}{The to:from name desigantion of the edge}
-#'   \item{basic_network_table$SumOccurancel}{how many times is to vertex connected to
-#'    from vertex across all pathway commons data bases and interaction types}
+#'   
 #'   ...
 #' }
 "basic_network_table"
-
+ 
 #' Basic Network Interactions
 #'
 #' This Resources is a list of networks. Each network is every interaction in 

@@ -1,4 +1,4 @@
-#' Sample simple network
+#' Sample  network
 #'
 #' A simple example network without weights
 #'
@@ -101,9 +101,8 @@
 #' CHEMI interactions are present. The igraph network object consisting of 
 #' 30,910 genes and 1,902,605 interactions. 
 #'
-#' @format A list object
+#' @format A data table
 #' \describe{
-#'   \item{basic_network_table$total}{total Pathway Commons Database in an dataframe}
 #'   \item{basic_network_table$to}{Origin Vertex}
 #'   \item{basic_network_table$from}{Target Vertex}
 #'   \item{basic_network_table$interaction}{Type of interaction}
@@ -117,8 +116,6 @@
 #'   \item{basic_network_table$Edge}{The to:from name desigantion of the edge}
 #'   \item{basic_network_table$SumOccurancel}{how many times is to vertex connected to
 #'    from vertex across all pathway commons data bases and interaction types}
-#'   \item{basic_network$graph}{A list of igraph network objects by interaction 
-#'   type, all edge and vertex attributes are the same as basic_network$network}
 #'   ...
 #' }
 "basic_network_table"

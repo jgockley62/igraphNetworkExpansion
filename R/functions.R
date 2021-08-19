@@ -1075,7 +1075,7 @@ network_load <- function (syn_id, form, synap_import) {
 #' @param vect the edge attributes to tabulate
 #' @param filt the edge attribute name to remove duplicates of default. Edge
 #' 
-#' @example 
+#' @examples 
 #' \dontrun{
 #' data(basic_network)
 #' base_net_ppi( 
@@ -1110,7 +1110,7 @@ base_net_ppi <- function( i_net,vect,filt='Edge' ){
 #' @param vect the edge attributes to tabulate
 #' @param filt the edge attribute name to remove duplicates of default. Edge
 #' 
-#' @example 
+#' @examples 
 #' \dontrun{
 #' derived_net_ppi( 
 #'  i_net = list(basic_network), 
@@ -1136,7 +1136,7 @@ derived_net_ppi <- function( d_net,vect,filt='Edge' ){
 #' @param base The Base Enrichment Network Stats from `base_net_ppi`
 #' @param derived The Derived Enrichment Network Stats from `derived_net_ppi`
 #' 
-#' @example 
+#' @examples 
 #' \dontrun{
 #' data(basic_network)
 #' base <- base_net_ppi( 
@@ -1145,7 +1145,6 @@ derived_net_ppi <- function( d_net,vect,filt='Edge' ){
 #'     'Lung', 'Muscle', 'Thymus'
 #'   ) 
 #' )
-#' }
 #' derived <- derived_net_ppi( 
 #'  i_net = list(basic_network), 
 #'  vect =c( 'Brain', 'Heart', 'Kidney', 'Liver',
@@ -1205,7 +1204,7 @@ ppi_enrichment <- function( base,derived ){
 #' @param scaled Scale the fold change by filter methods of each tissue 
 #' default No. Values accepted; YES or NO
 #' 
-#' @example 
+#' @examples 
 #' \dontrun{
 #' data(basic_network)
 #' base <- base_net_ppi( 
@@ -1214,7 +1213,6 @@ ppi_enrichment <- function( base,derived ){
 #'     'Lung', 'Muscle', 'Thymus'
 #'   ) 
 #' )
-#' }
 #' derived <- derived_net_ppi( 
 #'  i_net = list(basic_network), 
 #'  vect =c( 'Brain', 'Heart', 'Kidney', 'Liver',

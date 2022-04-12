@@ -18,8 +18,8 @@
 #'  }
   log_into_synapse <- function(usr=NULL, pass=NULL) {
   #install 
-  reticulate::conda_create("r-reticulate")
-  reticulate::conda_install( channel = 'bioconda', packages="synapseclient")
+  #reticulate::conda_create("r-reticulate")
+  #reticulate::conda_install( channel = 'bioconda', packages="synapseclient")
   synapseclient <- reticulate::import("synapseclient")
   client_import <- synapseclient$Synapse()
   if (is.null(usr) & is.null(pass)){
@@ -168,10 +168,6 @@ sif_loader <- function( sifs, synap_import){
   net_oldStyle <- igraph::graph_from_data_frame(d=total, vertices=genes, directed=T) 
   return( list( df=total, net=net_oldStyle, graph=graph ) )
 }
-
-
-
-
 #' Pull Synapse Table into Dataframe
 #' The purpose. of this function is to pull info from a synapse table into a
 #' dataframe.
@@ -664,7 +660,6 @@ path_obj_filter <- function(
   
   return( vertices )
 }
-
 #' Finds the limit cutoff when target and sentinal paths are given
 #'
 #' Limit is based on whichever value is greater between; the mean or median 
@@ -768,7 +763,6 @@ find_limit <- function ( s_path, t_path, weights, cores=1) {
     s_verts = sent_keep_vertices
   ))
 }  
-
 #' Traces the shortest paths of a gene to a vector of Target Gene and a vector 
 #' of Sentinal Genes 
 #' 
@@ -851,6 +845,25 @@ short_paths <- function( tnet, target, targets, sentinals, cores = 1 ){
     cores = cores
   )
   return(list( Inter = t_vertices, Sentinal=s_vertices))
+}
+#' Wraps the Short Paths Trace Function  
+#' 
+#' Applies an additional set of run mechanisms to the network based on an 
+#' input list of filter conditions. These filter the network based exact matches
+#' of edge or vertex values and traces the network based on this subgraph. Set to
+#' Null to not initialize or to inclued entire net in one trace set sublist to NULL.
+#' 
+#' @export 
+#' @param tnet igraph network (Main entire network) eg. net/net_undirected/JS_net_undirected
+#' @param target the from gene target eg Genes[1]
+#' @param targets List of the total list of targets in the User set eg. Genes
+#' @param sentinals List of the sentinal genes to trace to eg. Sentinal
+#' @param partition 
+#' @param cores the number of cores to use in paralellizable functions
+#' @return List object of Inter genes from target path traces and Sentinal genes
+#' from sentinal gene traces
+wrap_short_paths <- function() {
+  
 }
 #' Process a path trace list
 #'
